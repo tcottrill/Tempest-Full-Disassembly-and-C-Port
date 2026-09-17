@@ -222,16 +222,32 @@ grid, and charges each pass the CPU time the 6502 would have spent, from a
 cost model fitted on 19,994 oracle passes: 9.21 IRQs per pass, machine time
 against wall time 1.0000.
 
-### Six copy-protection checks, none of which can fire
+### Six copy-protection checks, and why Tempest crashes under emulation
 
 Rev 3 carries six tamper checks: sums over the copyright literal and over
 ROM, a check of the copyright message as it sits in vector RAM, and two that
-test that POKEY's `RANDOM` behaves like the real chip, cycle for cycle. Each
-sets a cell that, many waves or 150,000 points later, quietly corrupts the
-game — a stray `SED`, an `INC` run through zero page. On genuine hardware all
-six cells stay zero: the long scripted game reaches wave 24 with every one of
-them clear on every pass. [`c_src/FINDINGS.md`](c_src/FINDINGS.md) has the
-table, the addresses, and the comments the ROM proved wrong.
+test that POKEY's `RANDOM` behaves like the real chip, cycle for cycle. A
+failed check does nothing at the time. It sets a cell that, many waves or
+150,000 points later, quietly corrupts the game — a stray `SED`, an `INC` run
+through zero page, a write into the stack, a watchdog reset.
+
+These checks are well known for crashing the game under emulation, the
+`RANDOM` checks and the copyright checks above all: the game plays normally
+and then glitches or resets from around 150,000 points, because a POKEY that
+is not exact to the cycle, or a copyright message that is altered or not
+built as the board builds it, tripped a check long before. The `RANDOM` tests
+leave no margin. Two reads of `RANDOM` taken 4 cycles apart must overlap by a
+nibble, and the first read after `SKCTL = 0` must still see the held `$FF`.
+
+So the port had to be exact here, and it measures that it is. With the real
+POKEY poly counters clocked on one cycle timeline all six cells stay zero:
+the long scripted game reaches wave 24 and 194,152 points on the oracle with
+every one of them clear on every pass, and the native build's self test
+watches them on every pass as well. Its POKEY probe also shows the failure
+emulators hit: charge a `RANDOM` read 5 cycles instead of 4 and the nibble
+check trips in 5,908 of 6,000 start phases.
+[`c_src/FINDINGS.md`](c_src/FINDINGS.md) has the table, the addresses, and
+the comments the ROM proved wrong.
 
 ## Provenance and method
 

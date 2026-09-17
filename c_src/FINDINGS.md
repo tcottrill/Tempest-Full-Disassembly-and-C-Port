@@ -96,9 +96,13 @@ closed). The catches that changed the port, its harness or its plans:
 
 ## 3. Findings about the ROM (rev 3)
 
-**Copy protection: six checks, none can fire on genuine hardware.** All six cells
-are cleared by RESET's RAM clear and set only by an altered ROM or a POKEY that
-does not behave like the real chip:
+**Copy protection: six checks, the well-known cause of Tempest crashing under
+emulation.** All six cells are cleared by RESET's RAM clear and set by an
+altered ROM, a copyright message that is not in vector RAM as the board builds
+it, or a POKEY that does not behave like the real chip to the cycle. Nothing
+happens when a check fails; the damage comes waves or 150,000+ points later,
+which is how the RANDOM checks and the copyright checks came to be known for
+crashing the game on emulators:
 
 | cell | set by | effect when set |
 |---|---|---|
@@ -109,7 +113,11 @@ does not behave like the real chip:
 | QT5 $011F | ZPONTS $AE1F: two RANDOM reads 4 cycles apart need hi(r1) = lo(r2) | ZQPONS $C5B1: `INC $0200,X` once LSCORH >= $15 |
 
 The `fuseball_pulsar` scenario plays to wave 24 and 194,152 points with all six
-cells 0 on every pass.
+cells 0 on every pass, and `tests\tempest_selftest.exe` watches QT1/QT2/QT4/QT5
+on every pass of the native build. Its POKEY probe shows how little it takes to
+trip them: over 6000 start phases QT4 and QT5 stay 0 with a RANDOM read charged
+4 cycles and a write 8, while a read charged 5 sets QT5 in 5908 of them and a
+write charged 4 sets QT4 in 4471.
 
 **Wrong comments in the commented source.** ZQPONS's `CPX #$15` is commented
 "16,000"; on the BCD high byte it is **150,000**. ZQVAVG's `LDA #$17 / CMP LSCORH /
