@@ -84,5 +84,7 @@ echo === tests\avgshapes.exe
 cl %FLAGS% /Foobj\avg\ tests\avgshapes.c avg.c state.c progrom.c vecrom.c /Fe:tests\avgshapes.exe || exit /b 1
 echo === tests\avgframe.exe
 cl %FLAGS% /Foobj\avg\ tests\avgframe.c avg.c state.c progrom.c vecrom.c /Fe:tests\avgframe.exe || exit /b 1
+echo === tests\avgtime.exe
+cl %FLAGS% /Foobj\avg\ tests\avgtime.c avg.c state.c progrom.c vecrom.c /Fe:tests\avgtime.exe || exit /b 1
 
 echo ALL BUILDS OK

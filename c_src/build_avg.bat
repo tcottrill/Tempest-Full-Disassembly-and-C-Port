@@ -4,6 +4,7 @@ rem Kept apart from build_all.bat while ALDIS2 is in progress; merge later.
 rem
 rem   tests\avgshapes.exe   Gate V: every vector-ROM shape vs tests\ref\avg_shapes_ref.txt
 rem   tests\avgframe.exe    walks tests\ref\frame_NNNN.vram, writes segments + SVG
+rem   tests\avgtime.exe     draw time / refresh rate of every frame_NNNN.vram in a folder
 rem
 rem Reference data:  python tools\avg_ref.py shapes
 rem                  python tools\avg_ref.py frame tests\avg_out 0064 0256 0576
@@ -21,5 +22,8 @@ cl %FLAGS% /Foobj\avg\ tests\avgshapes.c avg.c state.c progrom.c vecrom.c /Fe:te
 
 echo === tests\avgframe.exe
 cl %FLAGS% /Foobj\avg\ tests\avgframe.c avg.c state.c progrom.c vecrom.c /Fe:tests\avgframe.exe || exit /b 1
+
+echo === tests\avgtime.exe
+cl %FLAGS% /Foobj\avg\ tests\avgtime.c avg.c state.c progrom.c vecrom.c /Fe:tests\avgtime.exe || exit /b 1
 
 echo AVG BUILDS OK

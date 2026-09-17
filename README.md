@@ -41,7 +41,7 @@ trace beside it.
 |-------|------|
 | [`disasm/`](disasm/README.md) | the disassembly: the program ROM and the colour AVG vector ROM as plain assembler source that re-encodes to the ROM byte for byte, a defines file carrying the memory map, the hardware registers and Atari's RAM variables, the shape preview above, and the Python tools that generate and verify all of it from a ROM set — among them `macasm.py`, an assembler for Atari's own source dialect |
 | [`c_src/`](c_src/README.md) | the C port: the whole 6502 program as C11, one file per Atari module; real AVG words built in a modelled 4K vector RAM; the Mathbox running its real bit-slice microcode; two real POKEYs and a real ER2055 EAROM behind the hardware seam; a Windows host (OpenGL beam renderer, XAudio2 sound, mouse / keyboard / joystick spinner, persistent high scores, the cabinet's own self test); the oracle, the call-by-call verifier and their scenario scripts; and a prebuilt **`tempest_win.exe`** with its **`tempest_win.ini`**. Builds with Visual Studio 2022, no external SDK |
-| [`c_src/FINDINGS.md`](c_src/FINDINGS.md) | what the port proved and what it found: the six copy-protection checks, the wrong comments, the 27 Hz game loop, the verification techniques |
+| [`c_src/FINDINGS.md`](c_src/FINDINGS.md) | what the port proved and what it found: the six copy-protection checks, the wrong comments, the 61.5 Hz picture over a 27 Hz game loop, the verification techniques |
 | [`disasm/_survey/tempest_inputs.md`](disasm/_survey/tempest_inputs.md) | the survey the work started from: ROM sets, memory map, Atari's source dialect |
 
 Comments in `c_src` cite `PLAN.md`, `NOTES_m8.md` and `NOTES_m9.md`: the
@@ -211,16 +211,39 @@ exact byte before being reverted.
 - **Program:** 20K of 6502 code at `$9000-$DFFF`; the top of it is mirrored at
   `$E000-$FFFF`, which is where the 6502 finds its vectors.
 
-### The game runs at 27 Hz
+### The picture runs at 61.5 Hz, the game logic at 27
 
-The mainline waits until the IRQ has counted nine ticks (`CMP #$09` at
-`$C7A9`) before it runs a pass, so the game logic runs at **246.09 / 9 = 27.3
-passes per second at most** — measured on the oracle, 9.214 IRQs per attract
-pass. The vector generator meanwhile redraws the same list continuously. The
-port keeps one cycle timeline at 1.512 MHz, services the IRQ on the 6,144-cycle
-grid, and charges each pass the CPU time the 6502 would have spent, from a
-cost model fitted on 19,994 oracle passes: 9.21 IRQs per pass, machine time
-against wall time 1.0000.
+Two clocks, and they are not the same one. The **picture** belongs to the
+vector generator: four 246.09 Hz IRQs per picture, **61.5 Hz**, and never
+faster — but a crowded display list costs the AVG more than those 16.25 ms to
+draw, and then the picture takes what the list costs: 57 to 60 Hz in waves 2
+and 3, around 50 Hz while the player drops down the well, 46 Hz in the attract
+demo. The **game logic** is slower and separate: the mainline waits until the
+IRQ has counted nine ticks (`CMP #$09` at `$C7A9`) before it runs a pass,
+246.09 / 9 = 27.3 passes per second at most (9.214 IRQs per attract pass on
+the oracle), so each list is drawn about twice before the next pass changes
+it.
+
+The port models both. It keeps one cycle timeline at 1.512 MHz, services the
+IRQ on the 6,144-cycle grid and charges each pass the CPU time the 6502 would
+have spent, from a cost model fitted on 19,994 oracle passes (9.21 IRQs per
+pass, machine time against wall time 1.0000). The picture is an event on the
+same timeline, and its length is **counted, not approximated**: as `avg.c`
+walks the list it adds up the AVG's own cycles — the state PROM's ticks for
+every instruction plus the timer of every vector and every centring, at the
+12.096 MHz master clock — and cycles / 12.096 MHz is the picture's time, four
+IRQs at the least. `tools\avg_prom_sim.py` checks that count against MAME's
+AVG state machine run on the real state PROM: 582 recorded lists, identical to
+the cycle. Measured on the Windows build over a minute of attract and play:
+246.09 IRQ/s, 26.8 passes/s, 54 pictures a second; wave 1 draws in 15.9 ms
+(61.5 Hz), wave 2 in 17.1 ms (58.5 Hz), wave 3 in 16.8 ms (59.6 Hz).
+
+Tempest's master lists end in `JMPL VECRAM` and the IRQ only restarts a halted
+AVG, so nothing in the program holds a short list back; `vg_window=free` in
+`tempest_win.ini` drops the four-IRQ floor and shows that, up to 130 pictures
+a second on a near-empty screen. `tests\avgtime.exe` prints the draw time and
+both rates for any recorded list, and `tempest_win.log` ends every session
+with the draw time of each game state and wave.
 
 ### Six copy-protection checks, and why Tempest crashes under emulation
 

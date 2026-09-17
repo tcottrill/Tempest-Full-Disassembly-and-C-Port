@@ -111,6 +111,17 @@ static uint64_t vg_start_cyc, vg_busy_until;
 static int      vg_ends_in_halt;
 static int      vg_cache_valid;    /* inside one IRQ: the list already walked, no HALT */
 
+/* The picture (vg_picture): MAINLN's lists loop, so the AVG redraws the list
+ * back to back and every traversal is one refresh of the monitor. */
+static int      vg_pic_on;         /* a VGSTARTed list is being redrawn (MAINLN only) */
+static uint64_t vg_pic_cyc;        /* the cycle its next traversal starts */
+static int      vg_pic_blank;      /* the last picture presented had nothing lit */
+static unsigned long n_pictures;   /* traversals of looping lists */
+static uint64_t pic_cyc_sum;       /* their draw time, CPU cycles */
+static uint32_t pic_cyc_min, pic_cyc_max;
+static unsigned long pic_irqs_hist[2][10];  /* [in a game][IRQs per picture, 9 = 9+] */
+static double   pic_draw_ms[2];
+
 /* software watchdog; CPU restarts (M9 B5) */
 static jmp_buf  wd_jmp;
 static int      wd_armed;
@@ -332,12 +343,13 @@ void hw_vgstart(void)
 {
     vg_running = 1; vg_start_cyc = mach_cyc; vg_ends_in_halt = 0; vg_cache_valid = 0;
     if (g.cpu_loop == LOOP_DIAG) diag_vgstart_qstate = QSTATE;     /* the screen SSTATE just drew */
+    else { vg_pic_on = 1; vg_pic_cyc = mach_cyc + AVG_VGGO_LEADIN / AVG_CYC_PER_CPU; }
     io_write();
 }
 
 void hw_vgstop(void)
 {
-    vg_running = 0; vg_cache_valid = 0;
+    vg_running = 0; vg_cache_valid = 0; vg_pic_on = 0;
     if (g.cpu_loop == LOOP_DIAG) diag_timest_cyc = mach_cyc;       /* $DAA9 TIMEST: the wait is over */
     io_write();
 }
@@ -487,23 +499,35 @@ static void machine_idle(double remain)
     if (remain > 2.0) plat_sleep_ms(1);
 }
 
-/* Service the next IRQ when the clock says it is due. */
+static void vg_picture(void);
+
+/* Service the next IRQ when the clock says it is due - and, on the way, every
+ * picture the AVG starts before it (vg_picture), each at its own due time. */
 static void machine_tick(void)
 {
     for (;;) {
         double now = clock_ms(), due;
+        int pic;
+        uint64_t ev;
         if (!clk_valid) {                   /* (re)anchor the clock: the CPU is at mach_cyc now */
             clk_base_ms = now;
             clk_base_cyc = mach_cyc;
             clk_valid = 1;
+            if (vg_pic_cyc < mach_cyc) vg_pic_cyc = mach_cyc;   /* no pictures owed from before */
         }
-        due = clk_base_ms + ((double)next_irq - (double)clk_base_cyc) * 1000.0 / TP_CPU_HZ * mach_scale;
+        pic = vg_pic_on && g.cpu_loop == LOOP_MAINLN && vg_pic_cyc <= next_irq;
+        ev = pic ? vg_pic_cyc : next_irq;
+        due = clk_base_ms + ((double)ev - (double)clk_base_cyc) * 1000.0 / TP_CPU_HZ * mach_scale;
         if (now - due > TP_STALL_MS) {      /* debugger / dragged window: do not dump IRQs */
             clk_base_ms = now;
-            clk_base_cyc = next_irq;
+            clk_base_cyc = ev;
             due = now;
         }
-        if (now >= due) { irq_service(); return; }
+        if (now >= due) {
+            if (pic) { vg_picture(); continue; }
+            irq_service();
+            return;
+        }
         machine_idle(due - now);
     }
 }
@@ -512,7 +536,8 @@ static void machine_tick(void)
 /* the frame boundary                                                  */
 /* ------------------------------------------------------------------ */
 
-static void emit_seg(void *ctx, const avg_seg *s)
+/* the pass boundary's statistics */
+static void count_seg(void *ctx, const avg_seg *s)
 {
     (void)ctx;
     if (s->intensity == 0) return;          /* a dark move: the beam is blanked */
@@ -521,14 +546,129 @@ static void emit_seg(void *ctx, const avg_seg *s)
     if (s->x0 >= -290 * 32768 && s->x0 <= 290 * 32768 && s->x1 >= -290 * 32768 && s->x1 <= 290 * 32768 &&
         s->y0 >= -285 * 32768 && s->y0 <= 285 * 32768 && s->y1 >= -285 * 32768 && s->y1 <= 285 * 32768)
         n_lit_window++;
+}
+
+/* to the renderer */
+static void line_seg(void *ctx, const avg_seg *s)
+{
+    (void)ctx;
+    if (s->intensity == 0) return;
     plat_video_line((float)AVG_Q15_TO_F(s->x0), (float)AVG_Q15_TO_F(s->y0),
                     (float)AVG_Q15_TO_F(s->x1), (float)AVG_Q15_TO_F(s->y1),
                     s->rgb, (int)s->intensity);
 }
 
-/* DISPLAY has just finished the list the AVG runs from $2000 (its master
- * list ends in JMPL VECRAM, so the AVG redraws it until the next pass
- * changes it): this is the frame. */
+static void emit_seg(void *ctx, const avg_seg *s)
+{
+    count_seg(ctx, s);
+    line_seg(ctx, s);
+}
+
+/* ---- the picture -----------------------------------------------------------
+ * MAINLN's pass rate is NOT the monitor's refresh rate.  The master lists end
+ * in JMPL VECRAM, so once VGSTARTed the AVG draws the list again and again
+ * with nothing in between, and the IRQ's VGSTOP / VGSTART ($D7C9) only fires
+ * when it finds the AVG halted (the SWHALT list).  One traversal = one
+ * refresh, and it lasts what the list costs the AVG (avg.h TIMING): the
+ * state machine's ticks plus every vector's timer.  On the oracle's dumps
+ * that is 16.4 ms on average in play (61 Hz), 24-25 ms in the heaviest
+ * scenes of fuseball_pulsar (40 Hz), against a game pass every 36.6 ms or
+ * more (FRTIMR >= 9): the same list is redrawn two or three times per pass.
+ *
+ * So the picture is an event of its own on the machine timeline: at
+ * vg_pic_cyc the list is walked as vector RAM stands, presented, and the
+ * next traversal is due its draw time later.  machine_tick serves these
+ * between the IRQs, each at its own wall-clock time.  (The pass's C code
+ * runs in no time at the loop head, so a picture inside the pass's charged
+ * CPU time already shows the list the pass built - earlier than the board
+ * by at most that CPU time, never later.)
+ *
+ * A list that HALTs is drawn once and stays dark until the IRQ restarts it;
+ * a blank one is presented once, not at the IRQ rate.  Headless builds keep
+ * frame_boundary's per-pass frame (the self-test's instrument) and only
+ * count the pictures.
+ *
+ * THE PICTURE PERIOD.  Counted, not approximated: avg_walk adds up the AVG's
+ * own cycles for the list - the state PROM's ticks per instruction plus every
+ * vector's and CNTR's timer, at the 12.096 MHz master clock (avg.h TIMING;
+ * tools\avg_prom_sim.py runs MAME's state machine on the real PROM and gets
+ * the same number on every list).  cycles / 8 = CPU cycles = the picture's
+ * time on this timeline.
+ *   TP_VGW_CYCLES (default) that time, but never less than 4 IRQs: 61.52 Hz is
+ *                 the most there is, and a list that costs more than 16.25 ms
+ *                 takes what it costs.
+ *   TP_VGW_FREE   that time with no floor (the ROM's looping list taken
+ *                 literally: a near-empty screen redraws at 130 Hz). */
+#define TP_PIC_MIN_CYC  1024u       /* host guard: no list is this short (the emptiest dump: 4.7 ms) */
+#define TP_PIC_MIN_IRQS 4u
+
+static int    vg_window = TP_VGW_CYCLES;
+static tempest_pic_row pic_rows[TP_PIC_ROWS];
+static int    n_pic_rows;
+
+int tempest_app_picture_rows(const tempest_pic_row **rows) { *rows = pic_rows; return n_pic_rows; }
+
+void tempest_app_set_vg_window(int mode)
+{
+    vg_window = mode == TP_VGW_FREE ? TP_VGW_FREE : TP_VGW_CYCLES;
+}
+
+static void vg_picture(void)
+{
+    avg_cfg cfg;
+    avg_result r = avg_run_frame(NULL);
+    uint32_t d = (r.cycles + AVG_CYC_PER_CPU - 1u) / AVG_CYC_PER_CPU;     /* the list's draw time, CPU cycles */
+    uint32_t floor_cyc = vg_window == TP_VGW_FREE ? TP_PIC_MIN_CYC : TP_PIC_MIN_IRQS * TP_IRQ_CYCLES;
+    if (r.stop == AVG_STOP_LOOP) {
+        int game = (QSTATUS & K_MATRACT) != 0;
+        double ms = avg_cycles_ms(r.cycles);
+        uint32_t n = (d + TP_IRQ_CYCLES - 1u) / TP_IRQ_CYCLES;          /* in IRQs, for the statistics */
+        if (n < TP_PIC_MIN_IRQS) n = TP_PIC_MIN_IRQS;
+        pic_irqs_hist[game][n > 9u ? 9u : n]++;
+        pic_draw_ms[game] += ms;
+        if (game) {                         /* per (QSTATE, wave), for the exit log */
+            int k;
+            for (k = 0; k < n_pic_rows; k++)
+                if (pic_rows[k].qstate == QSTATE && pic_rows[k].wave == CURWAV) break;
+            if (k == n_pic_rows && n_pic_rows < TP_PIC_ROWS) {
+                memset(&pic_rows[k], 0, sizeof pic_rows[k]);
+                pic_rows[k].qstate = QSTATE;
+                pic_rows[k].wave = CURWAV;
+                n_pic_rows++;
+            }
+            if (k < n_pic_rows) {
+                pic_rows[k].pictures++;
+                pic_rows[k].draw_ms += ms;
+                if (ms > pic_rows[k].draw_max) pic_rows[k].draw_max = ms;
+                if (pic_rows[k].draw_min == 0.0 || ms < pic_rows[k].draw_min) pic_rows[k].draw_min = ms;
+            }
+        }
+    }
+    if (d < floor_cyc) d = floor_cyc;
+    if (r.stop == AVG_STOP_LOOP) {
+        n_pictures++;
+        pic_cyc_sum += d;
+        if (pic_cyc_min == 0 || d < pic_cyc_min) pic_cyc_min = d;
+        if (d > pic_cyc_max) pic_cyc_max = d;
+        vg_pic_cyc += d;
+    } else if (r.stop == AVG_STOP_HALT) {
+        vg_pic_on = 0;                      /* until the next VGSTART */
+    } else {
+        vg_pic_cyc += d > 4u * TP_IRQ_CYCLES ? d : 4u * TP_IRQ_CYCLES;   /* a broken list (frame_boundary reports it) */
+    }
+    if (synthetic_only) return;
+    if (r.nlit == 0 && vg_pic_blank) return;
+    vg_pic_blank = r.nlit == 0;
+    memset(&cfg, 0, sizeof cfg);
+    cfg.seg = line_seg;
+    plat_video_begin((uint8_t)(out0_latch & (K_MVINVX | K_MVINVY)));
+    avg_run_frame(&cfg);
+    plat_video_present();
+}
+
+/* DISPLAY has just finished the list the AVG runs from $2000: the pass
+ * boundary.  The walk gives the pass-cost model its AVG ops and the
+ * statistics their numbers; headless builds also take it as the frame. */
 static uint32_t frame_boundary(void)
 {
     avg_cfg cfg;
@@ -536,9 +676,14 @@ static uint32_t frame_boundary(void)
     memset(&cfg, 0, sizeof cfg);
     cfg.seg = emit_seg;
     last_nlit = 0;
-    plat_video_begin((uint8_t)(out0_latch & (K_MVINVX | K_MVINVY)));
-    r = avg_run_frame(&cfg);
-    plat_video_present();
+    if (synthetic_only || g.cpu_loop != LOOP_MAINLN) {
+        plat_video_begin((uint8_t)(out0_latch & (K_MVINVX | K_MVINVY)));
+        r = avg_run_frame(&cfg);
+        plat_video_present();
+    } else {
+        cfg.seg = count_seg;                /* live: the pictures are vg_picture's */
+        r = avg_run_frame(&cfg);
+    }
     n_frames++;
     last_stop = r.stop;
     /* LOOP = the master list's JMPL VECRAM.  HALT at $3DCC is the ROM's own
@@ -937,6 +1082,10 @@ void tempest_app_get_stats(tempest_app_stats *s)
     s->machine_cycles = mach_cyc;
     s->diag = g.cpu_loop == LOOP_DIAG;
     s->diag_passes = n_diag_passes;
+    s->pictures = n_pictures;
+    s->picture_cycles = pic_cyc_sum;
+    memcpy(s->picture_irqs, pic_irqs_hist, sizeof s->picture_irqs);
+    s->picture_draw_ms[0] = pic_draw_ms[0]; s->picture_draw_ms[1] = pic_draw_ms[1];
     s->boots = n_boots;
     s->selftest_boots = n_diag_boots;
     s->watchdog_bites = n_wd_bites;
@@ -953,6 +1102,8 @@ void tempest_app_init(void)
     next_irq = TP_IRQ_CYCLES;
     spin_pos = 0; spin_pending = 0;
     vg_running = 0; vg_ends_in_halt = 0; vg_cache_valid = 0;
+    vg_pic_on = 0; vg_pic_cyc = 0; vg_pic_blank = 0;
+    n_pictures = 0; pic_cyc_sum = 0; pic_cyc_min = pic_cyc_max = 0;
     out0_latch = 0; outank_latch = 0;
     fast_ms = 0.0;
     clk_valid = 0;
@@ -1121,8 +1272,8 @@ typedef struct {
     ad_pokey p[2];
     mathbox  mb;
     uint64_t mach_cyc, next_irq;
-    int vg_running, vg_ends_in_halt;
-    uint64_t vg_start_cyc, vg_busy_until;
+    int vg_running, vg_ends_in_halt, vg_pic_on;
+    uint64_t vg_start_cyc, vg_busy_until, vg_pic_cyc;
 } st_snap;
 
 static void st_save(st_snap *s)
@@ -1131,6 +1282,7 @@ static void st_save(st_snap *s)
     s->mach_cyc = mach_cyc; s->next_irq = next_irq;
     s->vg_running = vg_running; s->vg_ends_in_halt = vg_ends_in_halt;
     s->vg_start_cyc = vg_start_cyc; s->vg_busy_until = vg_busy_until;
+    s->vg_pic_on = vg_pic_on; s->vg_pic_cyc = vg_pic_cyc;
 }
 
 static void st_restore(const st_snap *s)
@@ -1139,6 +1291,7 @@ static void st_restore(const st_snap *s)
     mach_cyc = s->mach_cyc; next_irq = s->next_irq;
     vg_running = s->vg_running; vg_ends_in_halt = s->vg_ends_in_halt;
     vg_start_cyc = s->vg_start_cyc; vg_busy_until = s->vg_busy_until;
+    vg_pic_on = s->vg_pic_on; vg_pic_cyc = s->vg_pic_cyc;
 }
 
 #define ST_PHASES 6000
@@ -1831,7 +1984,8 @@ int main(int argc, char **argv)
 
     /* ---- attract ---------------------------------------------------------- */
     {
-        unsigned long list0 = st_list_changes, fr0 = n_frames;
+        unsigned long list0 = st_list_changes, fr0 = n_frames, pic0 = n_pictures;
+        uint64_t picc0 = pic_cyc_sum, cyc0 = mach_cyc;
         uint32_t irq0 = g.irq_count;
         int left_attract = 0;
         for (int i = 0; i < attract; i++) {
@@ -1852,6 +2006,18 @@ int main(int argc, char **argv)
                  n_frames - fr0, st_list_changes - list0, n_frames - fr0 - n_walk_swhalt - n_walk_bad, n_walk_swhalt, n_walk_bad, avg_stop_name(last_stop), (unsigned)last_nlit);
         st_check(n_walk_bad == 0 && st_list_changes - list0 > (unsigned long)attract / 4 && hl_frames > 0,
                  "attract: display list live, LOOP", d);
+        {
+            /* the picture: the AVG's traversals of the looping list tile the machine time
+             * (less the blanked SWHALT stretches), at the list's own draw time - not one per pass */
+            unsigned long np = n_pictures - pic0;
+            double pc = (double)(pic_cyc_sum - picc0), mc = (double)(mach_cyc - cyc0);
+            double hz = pc > 0.0 ? TP_CPU_HZ * (double)np / pc : 0.0;
+            snprintf(d, sizeof d, "%lu pictures in %d passes (%.2f per pass), period mean %.2f ms = %.2f Hz, min %.2f max %.2f ms, covering %.1f%% of machine time",
+                     np, attract, (double)np / (double)attract, np ? pc / (double)np * 1000.0 / TP_CPU_HZ : 0.0, hz,
+                     (double)pic_cyc_min * 1000.0 / TP_CPU_HZ, (double)pic_cyc_max * 1000.0 / TP_CPU_HZ, mc > 0.0 ? 100.0 * pc / mc : 0.0);
+            st_check(np > (unsigned long)attract && hz > 35.0 && hz < 61.53 && pc / mc > 0.80 && pc / mc < 1.02,
+                     "attract: picture rate from the AVG cycle count, <= 61.52 Hz", d);
+        }
         snprintf(d, sizeof d, "extent x %.0f..%.0f y %.0f..%.0f; %.2f%% of %lu lit segs inside x+-290 y+-285",
                  bbox_minx, bbox_maxx, bbox_miny, bbox_maxy,
                  n_lit_total ? 100.0 * (double)n_lit_window / (double)n_lit_total : 0.0, n_lit_total);

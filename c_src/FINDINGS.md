@@ -170,10 +170,33 @@ held, so erases pressed close together overlap.
 
 ## 4. Hardware and timing findings
 
-- **27 Hz game loop.** MAINLN runs a pass when FRTIMR >= 9 (`CMP #$09` at LC7A9):
-  246.09 / 9 = 27.3 Hz at most; the ROM on the oracle averages **9.214 IRQs per
-  attract pass**, the native build 9.21 (30 s, machine/wall 1.0000). AAE's 240 Hz
-  IRQ (`fps_lock=240`) is 2.5 % slow.
+- **A 61.5 Hz picture over a 27 Hz game loop.** The two are separate clocks.
+  The picture: four IRQs each (246.09 / 4 = 61.5 Hz), never faster, and longer
+  when the list costs the AVG more than 16.25 ms. The native build makes it an
+  event on the machine timeline (`app_loop.c` vg_picture) whose length is the
+  AVG's own cycle count for the list - state-PROM ticks per instruction plus
+  each vector's and CNTR's timer at 12.096 MHz (`avg.h` TIMING,
+  `avg_result.cycles`) - with a 4-IRQ floor. The count is proven, not assumed:
+  `tools\avg_prom_sim.py` transcribes MAME 0.286's AVG state machine
+  (`avgdvg.cpp`), runs it on the real state PROM 136002-125 and gets `avg.c`'s
+  number to the cycle on 582 recorded lists. An earlier beam-length
+  approximation (1500 ns per unit of travel) was tried and dropped: it ran
+  ~13 % short of the counted time.
+  Counted draw times (oracle dumps every 20 passes, `tests\avgtime.exe`):
+  fuseball_pulsar, 214 lists, mean 16.37 ms, heaviest 25.10 ms = 39.8 Hz (797
+  segments); coin_start 17.62 ms; superzapper 17.45 ms; the logo zoom 37 ms.
+  Live, a minute of attract and play: wave 1 15.9 ms = 61.5 Hz, wave 2 17.1 ms =
+  58.5 Hz, wave 3 16.8 ms = 59.6 Hz, the drop down the well 18 ms, a new wave
+  19-23 ms, attract 20.5 ms = 46-49 Hz.
+  The floor is the port's: the master lists (SWNORM, SWMSGS) end in `JMPL
+  VECRAM` and the IRQ's VGSTOP / VGSTART ($D7C9) only fires on a halted AVG
+  (SWHALT), and MAME says the same of the hardware ("Tempest and Quantum keep
+  the AVG in an endless loop"), so a near-empty list would be redrawn faster
+  than 61.5 Hz - up to 130 Hz (`vg_window=free`), which no display can show.
+  The game logic: MAINLN runs a pass when FRTIMR >= 9 (`CMP #$09` at LC7A9),
+  246.09 / 9 = 27.3 passes/s at most; the ROM on the oracle averages **9.214 IRQs
+  per attract pass**, the native build 9.21 (30 s, machine/wall 1.0000). AAE's
+  240 Hz IRQ (`fps_lock=240`) is 2.5 % slow.
 - **IRQ 246.09 Hz** = 12.096 MHz / 4096 / 12 = one per 6144 CPU cycles at 1.512 MHz.
 - **RANDOM is a per-cycle poly counter.** The protection pair at $AE1F reads it 4
   CPU cycles apart and needs hi(r1) = lo(r2); INISOU's reads after SKCTL = 0 need
@@ -253,8 +276,11 @@ and self test on F2 (user-verified live, 2026-09-16). Every module is translated
 and verified; Gates V, 1, N, P, S and E pass.
 
 Open:
-1. Per-vsync redraw of the display list (the AVG redraws the list continuously;
-   the host shows the newest ~27 Hz frame) - discussed with the user, deferred.
+1. The picture is walked at the instant a traversal starts and from vector RAM as
+   the finished pass left it; the board draws it over the following 16 ms while
+   the mainline may already be rewriting a sub-buffer. Not modelled. (Until
+   2026-09-17 the host showed one frame per game pass, ~27 a second - wrong: the
+   monitor's rate is the AVG's, see §4.)
 2. Boots run on the synthetic clock: the self test's ~3 s dark RAM/ROM test and the
    0.56 s power-on delay take no wall time; the TEST-open boot is ~77k cycles short
    of the oracle (RAM clear not charged).

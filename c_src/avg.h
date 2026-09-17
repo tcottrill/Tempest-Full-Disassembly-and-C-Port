@@ -50,6 +50,20 @@
  *   targets the walk's start address (AVG_STOP_LOOP), on HALT, or when the
  *   instruction budget runs out (AVG_STOP_BUDGET).
  *
+ * TIMING (harvest/avg.c's cycle-true model; Tempest has the same state PROM,
+ *   136002-125, and avg_common_strobe3 sets the vector time)
+ *   The state machine runs from the 12.096 MHz master clock, one state-PROM
+ *   tick = 8 master cycles = one 6502 cycle (1.512 MHz).  Ticks per opcode:
+ *   VCTR 8, SVEC 6, STAT/SCAL 7, CNTR 5, JSRL 5, RTSL 4, JMPL 3, HALT 2, plus
+ *   one idle tick after VGSTART.  On top of that the beam itself: a VCTR
+ *   draws for $8000 - timer master cycles, an SVEC for $100 - (timer & $FF),
+ *   a CNTR settles for $8000 - timer, where timer is the shift register the
+ *   normalizer and the SCAL binary shifter fill - so the time follows the
+ *   magnitude class of the deltas and the binary scale, not the drawn length.
+ *   avg_result.cycles is that sum.  Because the master lists loop, the AVG
+ *   redraws the picture every `cycles` master cycles: that IS the refresh
+ *   period of the monitor (avg_cycles_ms), independent of MAINLN's pass rate.
+ *
  * Plain C11, no platform dependencies.  avg_walk() works on any avg_mem;
  * avg_mem_g() / avg_run_frame() bind it to the machine state g + vecrom[].
  */
@@ -64,6 +78,11 @@
 #define AVG_SPACE_END     0x4000
 #define AVG_STACK_SLOTS   4
 #define AVG_FRAME_BUDGET  20000u     /* default instruction budget per walk   */
+
+#define AVG_MASTER_HZ     12096000.0 /* AVG state machine clock (TIMING)      */
+#define AVG_CYC_PER_CPU   8u         /* master cycles per 6502 cycle / PROM tick */
+#define AVG_VGGO_LEADIN   8u         /* one idle PROM tick after VGSTART      */
+#define avg_cycles_ms(c)  ((double)(c) * (1000.0 / AVG_MASTER_HZ))
 
 #define AVG_Q15_ONE       32768
 #define AVG_Q15_TO_F(v)   ((double)(v) / 32768.0)
@@ -115,7 +134,9 @@ typedef struct {
 typedef struct {
     int64_t  x, y;             /* Q15                                          */
     int32_t  scale_q15;        /* current scale factor, Q15                    */
-    int      color;            /* colour latch (-1 allowed as "unset")         */
+    int      bin_scale;        /* SCAL binary field b: it also shifts the
+                                  vector timer (TIMING)                        */
+    int      color;           /* colour latch (-1 allowed as "unset")         */
     int      intensity;        /* STAT intensity latch 0..15                   */
     uint16_t stack[AVG_STACK_SLOTS];
     uint8_t  sp;               /* 4-bit hardware counter                       */
@@ -138,6 +159,9 @@ typedef struct {
     unsigned flags;            /* AVG_FLAG_*                                   */
     uint16_t stop_pc;          /* address of the instruction that ended it     */
     uint32_t ops;              /* instructions executed (incl. the last one)   */
+    uint32_t cycles;           /* draw time of the walk in AVG master cycles
+                                  (12.096 MHz; TIMING), without the VGGO
+                                  lead-in tick                                 */
     uint32_t nseg;             /* VCTR + SVEC executed                         */
     uint32_t nseg_stored;      /* segments written to cfg->segs                */
     uint32_t nlit;             /* segments with intensity > 0                  */

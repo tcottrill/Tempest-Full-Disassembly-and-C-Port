@@ -31,10 +31,12 @@ void plat_shutdown(void);
 
 /* ---- video: the colour segment sink --------------------------------------
  * app_loop.c walks the AVG display list from $2000 (avg.c, avg_run_frame)
- * once per MAINLN pass - at MAINLN's frame wait, after DISPLAY built the list
- * (~27.3 passes/s: 246.09 Hz IRQ / 9) - and hands every LIT beam movement to
- * the backend between begin and present.  Dark moves are not sent.  The host
- * display resamples (present the newest frame each vsync).
+ * once per picture - each time the AVG would have finished a traversal of
+ * MAINLN's looping list, timed by the list's own draw time (vg_picture:
+ * about 61 a second, 40 in heavy scenes; NOT once per MAINLN pass, which is
+ * ~27.3/s) - and hands every LIT beam movement to the backend between begin
+ * and present.  Dark moves are not sent.  The self test's diag loop and the
+ * headless builds present per pass.  The host display resamples.
  *
  * Coordinates (x0, y0, x1, y1): AVG space, exactly avg.c's - origin = the
  * beam centre (CNTR), +x right, +y up, 1.0 = one LSB of a 13-bit VCTR delta
@@ -164,6 +166,25 @@ void   tempest_app_exit(void);
  * and pitch scale together.  Call before tempest_app_init. */
 void   tempest_app_set_fps_lock(double irq_hz);
 
+/* The picture period (app_loop.c vg_picture): the AVG's own cycle count for
+ * the list (avg.h TIMING), / 12.096 MHz.  CYCLES (default): that time, never
+ * less than 4 IRQs (61.52 Hz).  FREE: that time with no floor.  Call before
+ * tempest_app_init. */
+#define TP_VGW_CYCLES 0
+#define TP_VGW_FREE   2
+void   tempest_app_set_vg_window(int mode);
+/* In-game pictures by (QSTATE, wave), for a backend's exit log: how long the
+ * lists of each game state take the AVG to draw. */
+#define TP_PIC_ROWS 96
+typedef struct {
+    uint8_t       qstate, wave;         /* QSTATE, CURWAV (wave - 1) */
+    unsigned long pictures;
+    double        draw_ms;              /* summed draw time (the AVG's cycle count), ms */
+    double        draw_min, draw_max;
+} tempest_pic_row;
+int    tempest_app_picture_rows(const tempest_pic_row **rows);
+
+
 /* Inside plat_sleep_ms: the time to the next IRQ the core is idling for, ms
  * (> 2 whenever plat_sleep_ms is called).  A backend must not block longer. */
 double tempest_app_idle_ms(void);
@@ -188,6 +209,10 @@ typedef struct {
     unsigned long watchdog_bites;       /* hardware watchdog reboots (WDGTST) */
     unsigned long jmp_resets;           /* DSPSYS JMP RESET */
     unsigned long soft_watchdog_trips;  /* the IRQ's software watchdog */
+    unsigned long pictures;             /* the AVG's traversals of MAINLN's looping list = the monitor's refreshes */
+    unsigned long picture_irqs[2][10];  /* pictures by length in IRQs (index 9 = 9 or more): [0] attract, [1] in a game */
+    double        picture_draw_ms[2];   /* summed draw time of those lists by the vg_window model, ms */
+    uint64_t      picture_cycles;       /* their summed draw time, CPU cycles (mean refresh = 1512000 * pictures / this) */
 } tempest_app_stats;
 void   tempest_app_get_stats(tempest_app_stats *s);
 

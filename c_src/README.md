@@ -74,7 +74,7 @@ back with the value that took effect.
 | section | keys |
 |---|---|
 | `[dips]` | the option switches by MAME/AAE name: N13 `coinage`, `right_coin`, `left_coin`, `bonus_coins`; L12 `minimum_credits`, `language`, `bonus_life`, `lives`; POKEY 2 pot lines `difficulty`, `rating`; POKEY 1 pot lines `cabinet` (upright / cocktail), `special_option`. Defaults = all switches off = the oracle's settings |
-| `[main]` | `vsync` (0 default: each ~27 Hz frame swapped when the game finishes it; 1: only at a refresh that cannot delay the next IRQ), `refresh_hz`, `fps_lock` (0 = the board's 246.09 Hz IRQ; 240 = AAE's rate, 2.5 % slower, game speed and sound scale together), `test_switch` (TEST at power-on), `watchdog_cycles` (hardware watchdog timeout, 1134000 = 0.75 s) |
+| `[main]` | `vsync` (0 default: each picture swapped the moment the AVG would have finished a traversal, about 61 a second; 1: only at a refresh that cannot delay the next IRQ), `refresh_hz`, `fps_lock` (0 = the board's 246.09 Hz IRQ; 240 = AAE's rate, 2.5 % slower, game speed and sound scale together), `test_switch` (TEST at power-on), `watchdog_cycles` (hardware watchdog timeout, 1134000 = 0.75 s) |
 | `[vector]` | `phosphor_ms`, `linewidth`, `gain`, `line_smoothing`, `corner_strength`, `fire_point_size` (unused) |
 | `[video]` | `rotate_sign` (1 upright, -1 turned 180 degrees), `honour_flip` (apply the ROM's OUT0 invert bits, cocktail player 2) |
 | `[input]` | `mouse_sensitivity` (0.5), `key_spin_rate` (180/s), `joy_spin_rate`, `invert_spin`, `mouse_capture` |
@@ -111,9 +111,39 @@ charges each pass the CPU time the 6502 would have spent
 (`tools\fit_passcost.py`). Measured over 30 s: 246.09 IRQ/s, attract 9.21 IRQs per pass
 (the ROM on the oracle: 9.214), machine/wall 1.0000, audio never starved. The
 self test runs with the IRQ masked; its diagnostic loop is paced on machine
-time (~90-140 passes per second, within 0.06 % of the oracle). The host shows
-the newest frame; a per-vsync redraw of the display list was discussed and
-left for later.
+time (~90-140 passes per second, within 0.06 % of the oracle).
+
+The picture has its own clock, not the pass rate: four IRQs per picture,
+**61.5 Hz**, never faster, and longer when the display list costs the AVG more
+than those 16.25 ms to draw - about two pictures per game pass. It is an event
+on the same cycle timeline (`vg_picture` in `app_loop.c`): the list is walked
+as vector RAM stands and presented, and the next picture starts when this one
+is drawn. How long that takes is counted, not approximated: `avg_walk` adds up
+the AVG's own cycles for the list - the state PROM's ticks per instruction
+(VCTR 8, SVEC 6, STAT/SCAL 7, CNTR 5, JSRL 5, RTSL 4, JMPL 3) plus the timer of
+every vector and centring, at the 12.096 MHz master clock (`avg_result.cycles`,
+`avg.h` TIMING) - and `tools\avg_prom_sim.py`, MAME 0.286's AVG state machine
+run on the real state PROM, gives the same count on all 582 recorded lists.
+
+| `[main] vg_window` | picture period |
+|---|---|
+| `cycles` (default) | the list's counted draw time, 4 IRQs (16.25 ms, 61.5 Hz) at the least |
+| `free` | the counted draw time with no floor - the ROM's looping list taken literally (`JMPL VECRAM`; the IRQ only restarts a halted AVG): up to 130 Hz on a near-empty screen |
+
+Measured over a minute of attract and play: 246.09 IRQ/s, 26.8 passes/s, 54
+pictures/s, machine/wall 1.0000. By game state, from the session summary the
+host writes to `tempest_win.log`:
+
+| | AVG draw time | picture rate |
+|---|---|---|
+| play, wave 1 | 15.9 ms | 61.5 Hz |
+| play, wave 2 / wave 3 | 17.1 / 16.8 ms | 58.5 / 59.6 Hz |
+| dropping down the well (`$20`) | 17.8 - 18.4 ms | 54 - 56 Hz |
+| new wave (`$18`) | 18.7 - 22.8 ms | 44 - 54 Hz |
+| attract | 20.5 ms | 46 - 49 Hz |
+
+`tests\avgtime.exe DIR` prints the cycle count, the draw time and both rates
+of every `frame_NNNN.vram` that `refrun --outdir DIR` dumped.
 
 ## Verification
 
@@ -257,10 +287,11 @@ bytes.
 | `platform\tempest_platform.h` | the platform contract |
 | `platform\windows\` | the Windows backend (`plat_win.c`: window, GL beam renderer, XAudio2 mixer, raw input, joystick, ini, log, screenshots; `win_probe.c` read-only peeks) |
 | `platform\headless\` | the quiet backend for the self-test |
-| `build_all.bat` | refrun, passcost, lockstep, skeleton, tempest_selftest, gate, avgshapes, avgframe |
+| `build_all.bat` | refrun, passcost, lockstep, skeleton, tempest_selftest, gate, avgshapes, avgframe, avgtime |
 | `build_win.bat`, `tempest_win.ini` | the window build and its settings |
 | `tests\refrun.c`, `tests\lockstep.c`, `tests\gate.c` | oracle, call-by-call verifier, trace-replay gate |
-| `tests\avgshapes.c`, `tests\avgframe.c` | Gate V and the frame walker |
+| `tests\avgshapes.c`, `tests\avgframe.c`, `tests\avgtime.c` | Gate V, the frame walker, and the draw time / refresh rate of recorded lists |
+| `tools\avg_prom_sim.py` | MAME's AVG state machine on the real state PROM (`--prom`, not distributed): proves `avg.c`'s draw time to the cycle |
 | `tests\scenarios\*.txt` | the 11 input scripts, each with its ROM reasoning in the header; syntax in `README_selftest.md` |
 | `tests\ref6502\` | the oracle's 6502 interpreter: all documented opcodes, NMOS decimal mode, callback memory (a copy of the shared `ref6502` core, which passes Klaus Dormann's functional test) |
 | `record_refs.bat` | records everything in the next three rows |

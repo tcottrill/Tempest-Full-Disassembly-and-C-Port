@@ -34,6 +34,45 @@ static int s5(unsigned v)
     return (v & 0x10u) ? (int)v - 0x20 : (int)v;
 }
 
+/* ---- draw time (avg.h TIMING; harvest/avg.c's cycle-true model) ---------- */
+
+/* Normalizer shift count (avg_strobe0): both 13-bit delta registers are
+ * shifted up until either has its bit 12 differing from bit 11; dvx == dvy
+ * == 0 cuts off at 16. */
+static int norm_shifts(unsigned dvy, unsigned dvx)
+{
+    int i = 0;
+
+    while (((dvy ^ (dvy << 1)) & 0x1000u) == 0 &&
+           ((dvx ^ (dvx << 1)) & 0x1000u) == 0 && i < 16) {
+        i++;
+        dvy = (dvy & 0x1000u) | ((dvy << 1) & 0x1FFFu);
+        dvx = (dvx & 0x1000u) | ((dvx << 1) & 0x1FFFu);
+    }
+    return i;
+}
+
+/* The timer shift register after nnorm normalizer shifts (avg_strobe0) and
+ * nbin binary-scale shifts (avg_strobe1).  op1 = the SVEC path: each shift
+ * also ORs $80 in and the register is masked to its low byte. */
+static unsigned timer_reg(int nnorm, int nbin, int op1)
+{
+    unsigned t = 0;
+    int      i;
+
+    for (i = 0; i < nnorm; i++)
+        t = (t >> 1) | (op1 ? 0x4080u : 0x4000u);
+    if (op1)
+        t &= 0xFFu;
+    for (i = 0; i < nbin; i++)
+        t = (t >> 1) | (op1 ? 0x4080u : 0x4000u);
+    if (op1)
+        t &= 0xFFu;
+    return t;
+}
+
+#define TICKS(n) ((uint32_t)(n) * AVG_CYC_PER_CPU)
+
 /* Word at CPU address a in the AVG map; 0 if outside $2000-$3FFF. */
 static int fetch(const avg_mem *m, uint32_t a, unsigned *w)
 {
@@ -86,6 +125,7 @@ void avg_state_init(avg_state *st)
     st->x = 0;
     st->y = 0;
     st->scale_q15 = 0;
+    st->bin_scale = 0;
     st->color = 0;
     st->intensity = 0;
     for (i = 0; i < AVG_STACK_SLOTS; i++)
@@ -190,6 +230,8 @@ avg_result avg_walk(const avg_mem *m, uint16_t start, avg_state *st_in,
             dx = s13(w2);
             z = (int)((w2 >> 13) & 7u);
             pc = (uint16_t)(pc + 4u);
+            r.cycles += TICKS(8) + (0x8000u - timer_reg(
+                norm_shifts(w & 0x1FFFu, w2 & 0x1FFFu), st->bin_scale, 0));
             goto draw;
 
         case OP_SVEC:
@@ -198,6 +240,9 @@ avg_result avg_walk(const avg_mem *m, uint16_t start, avg_state *st_in,
             z = (int)((w >> 5) & 7u);
             is_svec = 1;
             pc = (uint16_t)(pc + 2u);
+            r.cycles += TICKS(6) + (0x100u - (timer_reg(
+                norm_shifts(((w >> 8) & 0x1Fu) << 8, (w & 0x1Fu) << 8),
+                st->bin_scale, 1) & 0xFFu));
         draw: {
                 avg_seg s;
                 int64_t nx = st->x + (int64_t)dx * st->scale_q15;
@@ -239,9 +284,11 @@ avg_result avg_walk(const avg_mem *m, uint16_t start, avg_state *st_in,
             continue;
 
         case OP_STAT:
-            if (w & 0x1000u)                       /* SCAL */
+            r.cycles += TICKS(7);
+            if (w & 0x1000u) {                     /* SCAL */
                 st->scale_q15 = avg_scal_q15((int)((w >> 8) & 7u), (int)(w & 0xFFu));
-            else if (w & 0x0800u)                  /* colour STAT */
+                st->bin_scale = (int)((w >> 8) & 7u);
+            } else if (w & 0x0800u)                  /* colour STAT */
                 st->color = (int)(w & 0xFu);
             else                                   /* intensity STAT */
                 st->intensity = (int)((w >> 4) & 0xFu);
@@ -249,6 +296,8 @@ avg_result avg_walk(const avg_mem *m, uint16_t start, avg_state *st_in,
             continue;
 
         case OP_CNTR:
+            /* w & $FF seeds the settling timer through the normalizer */
+            r.cycles += TICKS(5) + (0x8000u - timer_reg(norm_shifts(w & 0xFFu, 0), 0, 0));
             st->x = 0;
             st->y = 0;
             pc = (uint16_t)(pc + 2u);
@@ -256,6 +305,7 @@ avg_result avg_walk(const avg_mem *m, uint16_t start, avg_state *st_in,
 
         case OP_JSRL: {
             uint16_t t = target(w);
+            r.cycles += TICKS(5);
             if (preview && !in_rom(t)) {
                 r.vram_calls++;
                 r.flags |= AVG_FLAG_VRAM_CALL;
@@ -268,6 +318,7 @@ avg_result avg_walk(const avg_mem *m, uint16_t start, avg_state *st_in,
         }
 
         case OP_RTSL:
+            r.cycles += TICKS(4);
             if (!pop(st, &pc)) {
                 r.stop = AVG_STOP_RTSL;
                 r.stop_pc = here;
@@ -277,6 +328,7 @@ avg_result avg_walk(const avg_mem *m, uint16_t start, avg_state *st_in,
 
         case OP_JMPL: {
             uint16_t t = target(w);
+            r.cycles += TICKS(3);
             if (preview && !in_rom(t)) {
                 r.vram_calls++;
                 r.flags |= AVG_FLAG_VRAM_CALL;
@@ -298,6 +350,7 @@ avg_result avg_walk(const avg_mem *m, uint16_t start, avg_state *st_in,
 
         case OP_HALT:
         default:
+            r.cycles += TICKS(2);                  /* halt visible after 2 ticks */
             r.stop = AVG_STOP_HALT;
             r.stop_pc = here;
             return r;

@@ -13,9 +13,10 @@
  *    space is clipped to the tube (x +-290, y +-285, AAE_DRIVER_SCREEN
  *    580 x 570), mirrored by the OUT0 invert bits and stretched onto a 3:4
  *    portrait picture (see xform_point for the orientation found on screen);
- *  - the game passes run at ~27 Hz; a pass hands over a frame and the backend
- *    presents the newest one on the display's own clock (vsync), from the
- *    core's idle path (plat_sleep_ms) - the host resamples;
+ *  - the core hands over a picture per AVG traversal (~61 a second, the
+ *    list's own draw time; the game passes run at ~27 Hz underneath) and the
+ *    backend swaps it at once (vsync=0) or presents the newest one on the
+ *    display's own clock from the core's idle path (plat_sleep_ms);
  *  - spinner: mouse X (raw mickeys), Left/Right keys, joystick X axis;
  *  - no samples (Tempest has none): the POKEY stream is the only sound;
  *  - files next to the exe: tempest_win.ini, tempest_win.log, tempest.nv;
@@ -516,6 +517,7 @@ static int   tuning_changed;              /* a hotkey changed mouse_sens / key_s
 static float key_spin_rate = 180.0f;      /* [input] key_spin_rate, counts/s */
 static int    swap_mode;
 static float  fps_lock;                 /* [main] fps_lock, IRQ Hz, 0 = native */
+static int    vg_window_ini;          /* [main] vg_window: TP_VGW_* */
 static double refresh_ms = 1000.0 / 60.0;
 static double last_swap_ms;
 static int    present_pending;
@@ -593,8 +595,8 @@ static void present_now(void)
 
 /* PRESENTATION POLICY (the Gravitar port's, M8 part 2).
  *
- * vsync=0 (default): plat_video_present draws and swaps at once, at MAINLN's
- * frame wait - a free-running swap never blocks, so nothing can distort the
+ * vsync=0 (default): plat_video_present draws and swaps at once, inside the
+ * core's wait for the next IRQ - a free-running swap never blocks, so nothing can distort the
  * IRQ grid.  present_idle only repaints (WM_PAINT / resize) and redraws the
  * phosphor afterglow.
  *
@@ -828,6 +830,17 @@ int plat_init(void)
     fps_lock = get_config_float("main", "fps_lock", 0.0f);
     if (fps_lock < 0.0f || (fps_lock > 0.0f && (fps_lock < 100.0f || fps_lock > 1000.0f))) fps_lock = 0.0f;
     set_config_float("main", "fps_lock", fps_lock);
+    {
+        /* [main] vg_window: how long a picture lasts (tempest_platform.h TP_VGW_*) */
+        char *s = get_config_string("main", "vg_window", "cycles");
+        vg_window_ini = TP_VGW_CYCLES;
+        if (s) {
+            if (_stricmp(s, "free") == 0) vg_window_ini = TP_VGW_FREE;
+            free(s);
+        }
+        set_config_string("main", "vg_window", vg_window_ini == TP_VGW_FREE ? "free" : "cycles");
+        LOG_INFO("[main] vg_window = %s", vg_window_ini == TP_VGW_FREE ? "free" : "cycles");
+    }
     LOG_INFO("[main] fps_lock = %.2f: IRQ at %.3f Hz (%s)", fps_lock, fps_lock > 0.0f ? fps_lock : 1512000.0 / 6144.0,
              fps_lock > 0.0f ? "board underclocked/overclocked to this rate" : "the board's own rate");
 
@@ -1407,6 +1420,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     double t_start, stat_t0;
     uint32_t stat_irq0, stat_pass0, irq_base = 0, pass_base = 0, last_irq = 0, last_pass = 0;
     unsigned long stat_swap0, stat_frames0, total_passes = 0;
+    /* title bar fps: a rolling average over the last FPS_AVG_N one-second samples, so a
+     * short stretch of an almost empty (fast) or crowded (slow) list does not make it jump */
+#define FPS_AVG_N 5
+    double fps_frames[FPS_AVG_N] = {0}, fps_secs[FPS_AVG_N] = {0}, fps_avg = 0.0;
+    int fps_slot = 0;
     uint32_t irq_start;
     ULONGLONG tick_start;
     unsigned long stat_diag0 = 0, diag_start = 0;
@@ -1425,6 +1443,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     }
     if (plat_init()) { log_close(); return 1; }
     tempest_app_set_fps_lock((double)fps_lock);
+    tempest_app_set_vg_window(vg_window_ini);
     tempest_app_set_watchdog_cycles(wd_cycles_ini);
     tempest_app_init();
     LOG_INFO("power-on done: first loop head reached, %u IRQs on the boot clock", (unsigned)win_probe_irqs());
@@ -1484,20 +1503,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 uint32_t irq_all = irq_base + irq, pass_all = pass_base + pass;
                 tempest_app_stats st;
                 tempest_app_get_stats(&st);
+                {
+                    double fsum = 0.0, ssum = 0.0;
+                    int k;
+                    fps_frames[fps_slot] = (double)(n_frames_in - stat_frames0);
+                    fps_secs[fps_slot] = dt;
+                    fps_slot = (fps_slot + 1) % FPS_AVG_N;
+                    for (k = 0; k < FPS_AVG_N; k++) { fsum += fps_frames[k]; ssum += fps_secs[k]; }
+                    fps_avg = ssum > 0.0 ? fsum / ssum : 0.0;
+                }
                 if (st.diag) {
                     /* the self test's diag loop: no IRQ; passes and machine time instead */
                     snprintf(s, sizeof s,
-                             "SELF TEST (TEST %s)  %.1f diag passes/s  machine/wall %.4f  %.1f fps (%.1f swaps/s)  %d segs  "
+                             "SELF TEST (TEST %s)  %.1f diag passes/s  machine/wall %.4f  %.1f fps avg %ds (%.1f now, %.1f swaps/s)  %d segs  "
                              "screen QSTATE %u  bites %lu",
                              last_test ? "on" : "OFF", (double)(st.diag_passes - stat_diag0) / dt,
                              (double)(st.machine_cycles - stat_cyc0) / 1512000.0 * (fps_lock > 0.0f ? 1512000.0 / 6144.0 / fps_lock : 1.0) / dt,
-                             (double)(n_frames_in - stat_frames0) / dt, (double)(n_swaps - stat_swap0) / dt,
+                             fps_avg, FPS_AVG_N, (double)(n_frames_in - stat_frames0) / dt, (double)(n_swaps - stat_swap0) / dt,
                              last_nsegs, win_probe_qstate(), st.watchdog_bites);
                 } else {
                     snprintf(s, sizeof s,
-                             "%.1f fps (%.1f swaps/s)  %.1f IRQ/s  %.2f IRQs/pass  frame %.1f..%.1f ms  %d segs  "
+                             "%.1f fps avg %ds (%.1f now, %.1f swaps/s)  %.1f IRQ/s  %.2f IRQs/pass  frame %.1f..%.1f ms  %d segs  "
                              "mouse %.2f keys %.0f/s  QSTATE $%02X wave %u  TEST %s",
-                             (double)(n_frames_in - stat_frames0) / dt, (double)(n_swaps - stat_swap0) / dt,
+                             fps_avg, FPS_AVG_N, (double)(n_frames_in - stat_frames0) / dt, (double)(n_swaps - stat_swap0) / dt,
                              (irq_all - stat_irq0) / dt,
                              pass_all > stat_pass0 ? (double)(irq_all - stat_irq0) / (double)(pass_all - stat_pass0) : 0.0,
                              frame_dt_max > 0.0 ? frame_dt_min : 0.0, frame_dt_max,
@@ -1548,6 +1576,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                      mcyc, wall, wall > 0.0 ? mcyc / wall : 0.0, st.diag_passes - diag_start,
                      wall > 0.0 ? (double)(st.diag_passes - diag_start) / wall : 0.0, st.boots, st.selftest_boots,
                      st.watchdog_bites, st.jmp_resets, st.soft_watchdog_trips);
+            /* the picture: the AVG's traversals of the looping list (app_loop.c vg_picture) */
+            LOG_INFO("picture: %lu pictures, mean period %.2f ms = %.2f Hz (vg_window); %lu presented = %.2f per wall s, "
+                     "%.2f per pass",
+                     st.pictures, st.pictures ? (double)st.picture_cycles / (double)st.pictures / 1512.0 : 0.0,
+                     st.picture_cycles ? 1512000.0 * (double)st.pictures / (double)st.picture_cycles : 0.0,
+                     n_frames_in, wall > 0.0 ? (double)n_frames_in / wall : 0.0,
+                     total_passes ? (double)n_frames_in / (double)total_passes : 0.0);
+            for (int gm = 0; gm < 2; gm++) {
+                unsigned long tot = 0;
+                for (int k = 0; k < 10; k++) tot += st.picture_irqs[gm][k];
+                LOG_INFO("picture (%s): %lu pictures, mean AVG draw time %.2f ms; by length in IRQs <=4:%lu 5:%lu 6:%lu 7:%lu 8:%lu 9+:%lu",
+                         gm ? "in a game" : "attract", tot, tot ? st.picture_draw_ms[gm] / (double)tot : 0.0,
+                         st.picture_irqs[gm][4], st.picture_irqs[gm][5], st.picture_irqs[gm][6], st.picture_irqs[gm][7],
+                         st.picture_irqs[gm][8], st.picture_irqs[gm][9]);
+            }
+            {
+                /* in a game, by game state and wave: what each kind of screen costs the AVG */
+                const tempest_pic_row *rows;
+                int nr = tempest_app_picture_rows(&rows);
+                for (int k = 0; k < nr; k++)
+                    if (rows[k].pictures >= 20) {
+                        double mean = rows[k].draw_ms / (double)rows[k].pictures;
+                        LOG_INFO("picture  QSTATE $%02X wave %2u: %5lu pictures, AVG draw time %.2f ms (min %.2f, max %.2f) = %.1f Hz",
+                                 rows[k].qstate, rows[k].wave + 1u, rows[k].pictures, mean, rows[k].draw_min,
+                                 rows[k].draw_max, 1000.0 / (mean > 6144.0 * 4.0 / 1512.0 ? mean : 6144.0 * 4.0 / 1512.0));
+                    }
+            }
         }
     }
     if (pass_log) fclose(pass_log);
