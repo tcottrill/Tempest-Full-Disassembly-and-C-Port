@@ -1,0 +1,18 @@
+# two_player - a two-player game with no input after the start (M4): covers
+# the player-switch display states DPLPLA ("PLAY PLAYER n", QDSTATE CDPLPL)
+# and DGOVER ("GAME OVER PLAYER n", CDGOVR, which jumps to HACKER), then a
+# coin and a spin in attract with the credit left over, which makes PROCRE
+# request DPRSTA ("PRESS START" mid-screen).
+# Format: PASS PORT VALUE  (tests/refrun.c --script).
+100  in1    0x3E    # coin (right mech): 1 coin 1 play by default
+104  in1    0x3F
+160  in1    0x3E    # second coin
+164  in1    0x3F
+300  allpo2 0x40    # START 2
+303  allpo2 0x00
+# both players sit still: player switches ~1198.., game over for player 1
+# ~2170 (DGOVER), game over ~2454, high-score table / logo in attract
+2800 in1    0x3E    # attract: coin
+2804 in1    0x3F
+2820 spin   1       # turn the knob with a credit: PROCRE -> "PRESS START" (DPRSTA)
+2840 spin   0

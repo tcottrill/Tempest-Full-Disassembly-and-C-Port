@@ -1,0 +1,81 @@
+# selftest_boot - power on with the TEST switch closed: the ROM's own self
+# test, every diagnostic screen, the watchdog reboot, then a second power
+# cycle into the self test with the now-good EAROM (M9 batch B2).
+# Run: tests\refrun.exe --frames 1800 --script tests\scenarios\selftest_boot.txt
+# Syntax: tests\scenarios\README_selftest.md (bit ports: 1 = pressed/closed).
+#
+# Why it works (read from ALTES2 / the listing, confirmed on refrun dumps):
+# - RESET ($D93F) reads IN1 b4 (MTEST) at $D983; closed -> zero-page march
+#   ($D9A9), RAM $0100-$07FF/$2000-$2FFF ($D9D6), ROM checksums (ROMTST
+#   $DA0A: all 12 are 0 on rev 3), POKEY RANDOM compares (OK1/OK2), REHIIN.
+#   The blank EAROM ($FF) fails its checksum: EARCND, JSR EAZERO, QSTATE 0
+#   (BADEAR) - the erase runs from the diag loop's EAUPD (every 4th pass)
+#   until pass ~281; BADEAR re-reads (REHIIN) and sets QSTATE 2 (ROMREP)
+#   at pass 282.  About 4.6 M cycles (3 s) pass before diag pass 1.
+# - Diag loop head $DA8D = one refrun pass of kind D (no IRQs: SEI).  TIMEST
+#   ($DAA9): SWFINA = ~IN1 & (coins|slam|diag); slam or diag held 3 passes
+#   (ASL DBSW from $20) -> QSTATE += 2; SSTATE ($DB0F) wraps 14 -> 2.
+#   Hold diag/slam 10 passes: DBSW ends at 0, one step per press.
+# - ROMREP (2) reads ALLPO2 (fire/zap/start1/start2 -> SWSTAT, sound ch1),
+#   IN1 coins/slam/diag (SWFINA, sound ch2), TBHD = ALLPOT & $0F every pass
+#   (so "spin 1" for 16 passes walks the clock hand over POTXTA/POTYTA 0..15),
+#   cocktail = ALLPOT b4 (COCMSG; start1/start2 flip OUT0/OUTANK), DOPSWI
+#   shows INOP0/INOP1/option 3 bits (non-zero DIPs for 20 passes).
+# - SHATCH 4 at 553, SHYSTER 6 at 603 (kept 550 passes: INDEX3++ every 64
+#   QFRAMEs over the 8 SNDTBL channels, VGSCAL ramp), SINTEN 8 at 1153,
+#   SCHEKR 10 at 1203 by SLAM (VGSTAT colours from TBHD/2: spin 32 passes),
+#   SIGANA 12 at 1263 (32 Mathbox starts), 14 -> ROMREP 2 at 1313.
+# - test 0 at 1360: $DAF0 sees MTEST open -> WDGTST ($DAF7) spins without a
+#   kick -> hardware watchdog (refrun --watchdog-cycles, default 1,134,000)
+#   -> RESET, TEST open: power-on delay, REHIIN (good EAROM now), INIINI,
+#   MAINLN: attract from pass 1361.
+# - 1510 test 1 + reset (applied after the line): the self test again; the
+#   EAROM checksum is good so OK2 sets QSTATE 2 directly (pass 1511).
+#   test 0 at 1600 -> second bite -> attract from pass 1601 to 1800.
+# Expected: 2 watchdog bites (both at $DAF7), CHKSMS 12 x 0, MBCOND RAMCND
+# PK1CND PK2CND EARCND 0 at the last diag pass, REFRUN: PASS.
+0    test 1        # TEST switch closed at power-on
+320  fire 1        # ROMREP switch test: buttons
+330  fire 0
+340  zap 1
+350  zap 0
+360  start1 1
+370  start1 0
+380  start2 1
+390  start2 0
+400  coinl 1       # coin switches
+405  coinl 0
+410  coinc 1
+415  coinc 0
+420  coinr 1
+425  coinr 0
+430  spin 1        # clock hand through all 16 spinner positions
+446  spin 0
+450  cocktail 1    # cocktail cabinet: COCMSG, start1/start2 flips
+460  start1 1
+470  start1 0
+480  start2 1
+490  start2 0
+500  cocktail 0
+510  inop0 0xA5    # DOPSWI with non-zero option switches
+510  inop1 0x5A
+530  inop0 0
+530  inop1 0
+550  diag 1        # -> SHATCH (4)
+560  diag 0
+600  diag 1        # -> SHYSTER (6)
+610  diag 0
+1150 diag 1        # -> SINTEN (8)
+1160 diag 0
+1200 slam 1        # slam steps like diag: -> SCHEKR (10)
+1210 slam 0
+1210 spin 1        # SCHEKR colours follow TBHD
+1242 spin 0
+1260 diag 1        # -> SIGANA (12)
+1270 diag 0
+1310 diag 1        # -> 14 -> wraps to ROMREP (2)
+1320 diag 0
+1360 test 0        # WDGTST -> watchdog reboot -> attract
+1510 test 1        # power cycle with TEST closed (good EAROM)
+1510 reset
+1600 test 0        # watchdog reboot -> attract

@@ -1,0 +1,17 @@
+# coin_start - drop a coin in each mech, start a one-player game, let it play
+# (no spinner or fire input: the player sits still until the game ends).
+# Format: PASS PORT VALUE  (tests/refrun.c --script).  IN1 coin bits are
+# active low (b0 right, b1 centre, b2 left); ALLPO2 buttons active high
+# (b3 zap, b4 fire, b5 start 1, b6 start 2).  Idle IN1 = $3F.
+100 in1 0x3E    # right coin in
+104 in1 0x3F    # out
+160 in1 0x3D    # centre coin in
+164 in1 0x3F
+220 in1 0x3B    # left coin in
+224 in1 0x3F
+300 allpo2 0x20 # START 1 down
+303 allpo2 0x00 # up
+600 allpo2 0x10 # FIRE (rating select / fire)
+602 allpo2 0x00
+900 allpo2 0x18 # FIRE + ZAP
+903 allpo2 0x00

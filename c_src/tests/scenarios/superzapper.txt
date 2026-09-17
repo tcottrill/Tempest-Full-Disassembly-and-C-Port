@@ -1,0 +1,50 @@
+# superzapper - a coined one-player game on wave 1 with three SUPERZAPPER
+# presses while flippers are on the well, then autofire play to game over,
+# a high-score entry and back to attract (M7; Gate P).  Format: PASS PORT
+# VALUE (tests/refrun.c --script; 'spin' steps the spinner nibble every
+# pass).  IN1 coin bits active low; ALLPO2 buttons active high (b3 zap,
+# b4 fire, b5 start 1).  Default option switches (1 coin 1 play).
+#
+# Why it works (read from the ROM, not guessed):
+# - PROSUZ ($A83A, called from PLAY at $9711) only acts outside attract with
+#   the cursor alive (CURSL2 plus): a latched ZAP (SWFINA & MSUZA) with
+#   SUZCNT < CSUMAX (2) increments SUZCNT and starts SUZTIM = 1; while SUZTIM
+#   runs it is incremented and KILENE ($A888) kills one live invader (INVAY
+#   non-zero, EXIKIL $A8A4 -> INCISQ) on every even SUZTIM from CSUSTA (3);
+#   the zap ends when SUZTIM reaches TIMAX,SUZCNT ($A883: use 1 = 3+8*2 = 19,
+#   use 2 = 3+1*2 = 5) or when KILENE finds no live invader ($A89E).  A third
+#   press with SUZCNT = 2 only clears the latch ($A853 BCS $A85D).  INISUZ
+#   ($91A4 / $9012) resets SUZCNT for each wave, so all presses are on wave 1.
+# - No FIRE before the zaps, so the flippers leave the nymph pool (NYMCOU 10
+#   -> 6) and climb the well.
+#
+# Blind play with this oracle (refrun dumps): coin credited (CRDT 1 by 300),
+# game from 302, RATE YOURSELF default level 1 (FIRE at 330), play from 354.
+#   440 zap 1: SUZTIM 1..$0B, four kills (+150 each), all dead -> $A89E
+#   470 zap 2: SUZTIM 1..4, one kill, TIMAX 5 expires -> $A874
+#   490 zap 3: SUZCNT stays 2 (no zaps left)
+# Autofire + spin 3 from 500 clears waves 1-3 (new SUZCNT each wave), game
+# over at 2393 with 010,137 > the 10,101 blank-EAROM defaults: PRBOOM,
+# GETINI (three FIRE presses), WRHIIN, attract at 2533.  Run 3000 passes.
+100  in1    0x3E    # coin (right mech)
+104  in1    0x3F
+300  allpo2 0x20    # START 1
+303  allpo2 0x00
+330  allpo2 0x10    # FIRE: level 1
+333  allpo2 0x00
+440  allpo2 0x08    # ZAP 1 (flippers on the well)
+443  allpo2 0x00
+470  allpo2 0x08    # ZAP 2
+473  allpo2 0x00
+490  allpo2 0x08    # ZAP 3: none left this wave
+493  allpo2 0x00
+500  allpo2 0x10    # autofire
+500  spin   3
+2400 allpo2 0x00    # game over (2393): initials entry
+2400 spin   0
+2510 allpo2 0x10    # first initial
+2513 allpo2 0x00
+2520 allpo2 0x10    # second initial
+2523 allpo2 0x00
+2530 allpo2 0x10    # third initial -> WRHIIN, attract
+2533 allpo2 0x00

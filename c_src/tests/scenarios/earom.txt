@@ -1,0 +1,41 @@
+# earom - play to a high score, enter initials (WRHIIN) and end the game
+# (WRBOOK), wait for the EAROM to go idle, pulse RESET (power cycle) and
+# boot from what the chip holds (M9 batch B2, Gate E).
+# Run: tests\refrun.exe --frames 2600 --script tests\scenarios\earom.txt
+#                       --earom-out tests\earom\earom.nv
+# then tests\scenarios\earom_readback.txt reads the image back.
+# Syntax: tests\scenarios\README_selftest.md.
+#
+# Why it works (read from the ROM, confirmed on refrun dumps):
+# - 100-2033 are high_score.txt's inputs (same pass numbers, bit ports
+#   instead of whole bytes, identical port values): blank EAROM -> INIINI
+#   defaults 10,101; one coin, START, level 5, autofire + slow spin until the
+#   game ends with 022008 ranked 1st; three FIRE presses for the initials;
+#   WRHIIN (rank < 4) queues the high-score groups, game end queues the
+#   bookkeeping (WRBOOK).  EAUPD (NONSTA, every pass) erases and writes
+#   them: EAFLG/EAREQU are 0 from pass 2118 on.
+# - 2300 reset: RESET with TEST open: power-on delay, REHIIN reads all
+#   groups back with good checksums (EABAD = 0 at pass 2301), INIINI keeps
+#   them, MAINLN.  Frame 2301's INITAL/HSCORL top three equal frame 2300's;
+#   BOOKKS equals the image, not frame 2300: SECOUL (game-up seconds, $0406)
+#   keeps counting in RAM after WRBOOK and is only saved at the next game end.
+# - Runs on in attract to 2600; --earom-out writes the 64-byte chip image.
+100  coinr 1       # coin (right mech)
+104  coinr 0
+300  start1 1      # START 1
+303  start1 0
+310  spin 0xFA     # RATE YOURSELF: cursor right to index 2 (level 5)
+322  spin 0
+330  fire 1        # FIRE: select level 5
+333  fire 0
+354  fire 1        # hold FIRE (autofire) for the whole game
+354  spin 2        # and spin slowly
+2000 fire 0        # initials entry (GETINI from pass ~1966)
+2000 spin 0
+2010 fire 1        # first initial
+2013 fire 0
+2020 fire 1        # second initial
+2023 fire 0
+2030 fire 1        # third initial -> WRHIIN
+2033 fire 0
+2300 reset         # power cycle once EAUPD is idle

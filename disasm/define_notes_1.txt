@@ -1,0 +1,210 @@
+# Descriptions for aliases in tempest_defines.asm that have no Atari comment (part 1: MAL .. LIFEY).
+# Format: NAME<TAB>description. Read by emit_defines.py (every define_notes_*.txt).
+# Evidence: Atari source (ALCOMN, ALDIS2, ALWELG, ALSCO2, ALTES2, ALHAR2, ALSOUN, ALVROM, COIN65), MBUDOC.DOC, tempest.cpp.
+MAL	Mathbox register A low byte (offset 0, write). Zeroed by INIMAT as an unused register
+MAH	Mathbox register A high byte (offset 1, write). Zeroed by INIMAT as an unused register
+MBL	Mathbox register B low byte (offset 2, write). Projection loads the inverse-scale multiplicand here
+MBH	Mathbox register B high byte (offset 3, write). Zeroed by INIMAT
+MEL	Mathbox register E low byte (offset 4, write). Zeroed by INIMAT as an unused register
+MEH	Mathbox register E high byte (offset 5, write). Zeroed by INIMAT as an unused register
+MFL	Mathbox register F low byte (offset 6, write). Zeroed by INIMAT as an unused register
+MFH	Mathbox register F high byte (offset 7, write). Zeroed by INIMAT as an unused register
+MXL	Mathbox register X low byte (offset 8, write). Projection loads abs(point - eye) X or Z delta here
+MXH	Mathbox register X high byte (offset 9, write). Zeroed by INIMAT
+MNL	Mathbox N (offset $0C): number of quotient bits. INIMAT sets $0F, CASCAL $18 for a fraction, READMB $10
+MZLL	Mathbox dividend Z byte 0 (offset $0D, lowest of 32 bits). Zeroed by INIMAT, set by self-test divides
+MZLH	Mathbox dividend Z byte 1 (offset $0E). WORSCR loads the abs Z/X deltas here, CASCAL loads YDEUNI
+MZHL	Mathbox dividend Z byte 2 (offset $0F). Zeroed by INIMAT, set by READMB
+MZHH	Mathbox dividend Z byte 3 (offset $10, highest of 32 bits). Zeroed by INIMAT, set by READMB
+SYM	Mathbox offset $12: any write starts the Y' multiply, output (x-e)b+(y-f)a. Starts projection multiply
+MSZXD	Mathbox offset $14: any write starts the Z/X' divide. Used by WORSCR, CASCAL and READMB
+MXPL	Mathbox X' (divisor) low byte (offset $15, write). Point depth minus eye Y (PYL-EYL)
+MXPH	Mathbox X' (divisor) high byte (offset $16, write)
+MDYPL	Mathbox offset $18: any write puts Y' low 16 bits on the output. Written after each multiply completes
+AUDF1	POKEY 1 AUDF1 ($60C0): channel 1 frequency. Base of the AUDF/AUDC pairs for sound channels 1-4 (X-indexed)
+AUDC1	POKEY 1 AUDC1 ($60C1): channel 1 control (distortion and volume). AUDC1+2n for channels 2-4
+AUDCTL	POKEY 1 AUDCTL ($60C8, write): audio control, set to AUDCV by INISOU. Same address as ALLPOT
+AUDF2	POKEY 2 AUDF1 ($60D0): frequency of sound channel 5. Base of the AUDF/AUDC pairs for channels 5-8
+AUDC2	POKEY 2 AUDC1 ($60D1): control of sound channel 5. Written only by the self-test sound check
+AUD2CTL	POKEY 2 AUDCTL ($60D8, write): audio control, set to AUDCV2 by INISOU (source spelling AUD2CT)
+S_TEST	$TEST: self-test switch byte, same address as $COINA (copy of IN1). Never referenced by name
+S_LAM	$LAM: slam switch byte for COIN65, same address as $COINA (IN1 copy). The coin routine tests the slam bit
+S_CMODE	$CMODE: coin option switches for COIN65, same address as OPTIN1. INILIT stores INOP0 EOR 2 here
+OPTIN2	Copy of option switches INOP1: b0 2-game minimum, b1-b2 language, b3-b5 bonus life, b6-b7 lives
+S_CNSTT	$CNSTT: coin status/detection timers, one byte per coin mech (3, MECHS). Used by COIN65
+S_PSTSL	$PSTSL: post-coin slam timers, one byte per coin mech (3). A slam in this window cancels the coin
+S_CCTIM	$CCTIM: pulse timers for the 3 electro-mechanical coin counters (negative = on). IRQ copies to OUT0
+S_BCCNT	$BCCNT: count of coins towards a bonus coin (COIN65). Cleared at power-on and game start
+S_CNCT	$CNCT: unit-coin count not yet making a credit. Non-zero shows the 1/2 picture after the credits
+S_BC	$BC: bonus coins accrued (COIN65). Cleared at power-on and game start
+TEMP0	General scratch byte, first of the work variables TEMP0-TEMP4
+TEMP1	General scratch byte, second work variable (same address as TEMPL)
+TEMPL	Alternate name for TEMP1 (same address). Not referenced by name in the program
+TEMP2	General scratch byte, third work variable
+TEMP3	General scratch byte, fourth work variable
+TEMP4	General scratch byte, fifth work variable
+TEMPX	Scratch byte, often a point X coordinate (world or screen). Also mathbox self-test divisor low
+TEMPY	Scratch byte, often a point Y (depth) coordinate. Also mathbox self-test divisor high
+TEMPZ	Scratch byte, point Z coordinate (right point in the line drawing setup)
+SAVEX	Scratch byte for saving the X register (loop index) across calls
+SAVEY	Scratch byte for saving the Y register (loop index) across calls
+INDEX1	General loop index/counter, first of INDEX1-INDEX4
+INDEX2	General loop index/counter, second of INDEX1-INDEX4
+INDEX3	Loop index/counter, third of INDEX1-INDEX4 (score display, self-test timer)
+INDEX4	Loop index/counter, fourth of INDEX1-INDEX4 (score display)
+INDYHI	High byte of the INDYLO indirect (zp),Y pointer
+LSCORH	Player 1 (left) score, high byte of the 3-byte BCD score LSCORL-LSCORH
+RSCORL	Player 2 (right) score, low byte of the 3-byte BCD score
+RSCORM	Player 2 (right) score, middle byte of the 3-byte BCD score
+RSCORH	Player 2 (right) score, high byte of the 3-byte BCD score
+WAVEN2	Player 2 wave number -1 (second slot of WAVEN1, accessed as WAVEN1,X)
+LIVES2	Player 2 bases left (second slot of LIVES1). Cleared for a one-player game
+SWSTRT	Alternate name for SWSTAT (debounced switches, 0 = on). Read to test the start buttons
+CURSPO	Cursor position between well lines (fine position, 3 bits used for the picture). Spinner input for initials
+OTB	Previous 4-bit spinner reading from ALLPOT. The difference is added to TBHD each IRQ
+PZL	Z coordinate of the point being projected (world), with PXL and PYL
+EYL	Eye (camera) Y position in world coordinates (depth), low byte. EYH high, EYLL fraction
+EZL	Eye (camera) Z position in world coordinates
+SZL	Projected screen Z (vertical) coordinate of the point, low byte (SXL/SXH is screen X)
+SZH	Projected screen Z (vertical) coordinate of the point, high byte
+XADJL	Screen X vanishing point, 2 bytes, added to projected X (0 = screen centre). ZADJL is the Z pair
+CURNTY	Current beam position, screen vertical coordinate, 2 bytes (pairs with CURNTX)
+YCOMP	Vertical (screen Z) component of the vector delta, 2 bytes at XCOMP+2
+SVGLIST	Saved VGLIST: second display list pointer, exchanged with VGLIST by SWAPVG (mainline/subroutine)
+X2L	ONELIN unit-vector multiples: 2 x X1L, low byte (XnL/XnH = n times the X unit vector)
+X3L	ONELIN unit-vector multiples: 3 x X1L, low byte
+X4L	ONELIN unit-vector multiples: 4 x X1L, low byte
+X5L	ONELIN unit-vector multiples: 5 x X1L, low byte
+X6L	ONELIN unit-vector multiples: 6 x X1L, low byte
+X7L	ONELIN unit-vector multiples: 7 x X1L, low byte
+X0H	ONELIN unit-vector multiples: 0 x X1L, high byte (zeroed by INIMAT, read indexed as X0H,Y)
+X1H	ONELIN unit-vector multiples: 1 x X1L, high byte (zeroed by INIMAT)
+X2H	ONELIN unit-vector multiples: 2 x X1L, high byte
+X3H	ONELIN unit-vector multiples: 3 x X1L, high byte
+X4H	ONELIN unit-vector multiples: 4 x X1L, high byte
+X5H	ONELIN unit-vector multiples: 5 x X1L, high byte
+X6H	ONELIN unit-vector multiples: 6 x X1L, high byte
+X7H	ONELIN unit-vector multiples: 7 x X1L, high byte
+Z0L	ONELIN unit-vector multiples: 0 x Z1L, low byte (zeroed by INIMAT, read indexed as Z0L,X/Y)
+Z1L	ONELIN Z unit vector: abs(screen Z delta) clamped to one byte, low byte (ZnL/ZnH = n x Z1L)
+Z2L	ONELIN unit-vector multiples: 2 x Z1L, low byte
+Z3L	ONELIN unit-vector multiples: 3 x Z1L, low byte
+Z4L	ONELIN unit-vector multiples: 4 x Z1L, low byte
+Z5L	ONELIN unit-vector multiples: 5 x Z1L, low byte
+Z6L	ONELIN unit-vector multiples: 6 x Z1L, low byte
+Z7L	ONELIN unit-vector multiples: 7 x Z1L, low byte
+Z0H	ONELIN unit-vector multiples: 0 x Z1L, high byte (zeroed by INIMAT)
+Z1H	ONELIN unit-vector multiples: 1 x Z1L, high byte (zeroed by INIMAT)
+Z2H	ONELIN unit-vector multiples: 2 x Z1L, high byte
+Z3H	ONELIN unit-vector multiples: 3 x Z1L, high byte
+Z4H	ONELIN unit-vector multiples: 4 x Z1L, high byte
+Z5H	ONELIN unit-vector multiples: 5 x Z1L, high byte
+Z6H	ONELIN unit-vector multiples: 6 x Z1L, high byte
+Z7H	ONELIN unit-vector multiples: 7 x Z1L, high byte
+UNITXH	High byte (sign) of the screen X delta between line endpoints in ONELIN. Sign for the unit vector
+UNITZL	Unit vector Z low byte slot. Allocated but never referenced (Z1L is used instead)
+UNITZH	High byte (sign) of the screen Z delta between line endpoints in ONELIN. Sign for the unit vector
+COLOR	Colour of the object being drawn, input to the picture and line routines
+NEWAIT	Allocated in ALCOMN (display variables). Never referenced by the program
+OFRTIM	Allocated in ALCOMN (display variables). Never referenced by the program
+OLDLHI	Old enemy line buffer start address, high byte (OLDLLO is the low byte)
+SINDEX	Sound channel being started by SNDON ($FF when none). MODSND skips that channel meanwhile
+CURSVH	Cursor acceleration down the well, high byte (CURSVL is the low byte)
+LEVELY	Well off-screen flags, 2 bytes: +0 top of well, +1 bottom of well (non-zero = off screen). Set by BLDWEL
+QT6	Security: checksum of the ATARI copyright display list in attract (0 = intact). Non-zero corrupts RAM later
+QT5	Security: POKEY random-number check result (0 = OK). If non-zero with a high score, ZQPONS corrupts RAM
+WPUMIN	Minimum number of pulsars on the well this wave (slot 1 of WFLMIN-WFUMIN, from WTABLE)
+WTAMIN	Minimum number of tankers on the well this wave (slot 2 of WFLMIN-WFUMIN, from WTABLE)
+WSPMIN	Minimum number of spinners (type 3) on the well this wave (slot 3 of WFLMIN-WFUMIN, from WTABLE)
+WFUMIN	Minimum number of fuseballs on the well this wave (slot 4 of WFLMIN-WFUMIN, from WTABLE)
+WPUMAX	Maximum number of pulsars on the well this wave (slot 1 of WFLMAX-WFUMAX, from WTABLE)
+WTAMAX	Maximum number of tankers on the well this wave (slot 2 of WFLMAX-WFUMAX, from WTABLE)
+WSPMAX	Maximum number of spinners (type 3) on the well this wave (slot 3 of WFLMAX-WFUMAX, from WTABLE)
+WFUMAX	Maximum number of fuseballs on the well this wave (slot 4 of WFLMAX-WFUMAX, from WTABLE)
+SPARE3	VG halted flag (2 bytes): IRQ increments it when the AVG halts. DISPLAY waits for it, INIDSP clears it
+OPPULS	Openings for pulsars (slot 1 of OPFLIP-OPFUSE), computed by NYMCHA. Accessed only as OPFLIP,X
+OPTANK	Openings for tankers (slot 2 of OPFLIP-OPFUSE). Smart launch picks a tanker for a long enemy line
+OPSPIN	Openings for spinners (slot 3 of OPFLIP-OPFUSE). Also the line loop counter in ASTRAL
+OPFUSE	Openings for fuseballs (slot 4 of OPFLIP-OPFUSE). Accessed only as OPFLIP,X
+FLIPCO	Count of active flippers (slot 0 of the per-type counts FLIPCO-FUSECO, indexed by invader type)
+TANKCO	Count of active tankers (slot 2 of FLIPCO-FUSECO). Cleared by INIINV
+SPINCO	Count of active spinners (slot 3 of FLIPCO-FUSECO). Cleared by INIINV
+FUSECO	Count of active fuseballs (slot 4 of FLIPCO-FUSECO). Cleared by INIINV
+FARY	Vortex logo rainbow far point depth (NEARY is the near point)
+OLOFLI	Nymph off-limit line flags of the last frame (copy of NEOFLI). Written at L991F, never read
+TYPCOD	Type code of the current wave parameter record (0 = end), dispatch index for DOTYPE/DONEXT
+WFUSIL	Fuseball speed, fraction (slot 4 of WINVIL). Set to twice the invader speed
+WFUSIH	Fuseball speed, integer (slot 4 of WINVIN). Set to twice the invader speed
+NYMPL	Nymph table (64 entries): well line number of each nymph. Particle arrays overlay this area
+PARLIY	Big Boom particle Y position, fraction (one byte per particle, overlays NYMPL)
+NYMPY	Nymph table (64 entries): depth of each nymph (0 = inactive). Reaching 0 converts it to an invader
+PARLIZ	Big Boom particle Z position, fraction (one byte per particle, overlays NYMPY)
+PARTIY	Big Boom particle Y position, integer ($80 = centre, 0 = particle inactive)
+INVCAM	Invader CAM program counter, one byte per invader (NINVAD = 7)
+INVLOO	Invader CAM loop counter, one byte per invader (set by JSLOOP, counted down by JELOOP)
+PARTIZ	Big Boom particle Z position, integer ($80 = centre)
+PARLYV	Big Boom particle Y velocity, fraction (random at launch)
+PARLZV	Big Boom particle Z velocity, fraction (random at launch)
+LINSXL	Well line near point screen X, low byte, one per line (LINSXH high)
+LINSZH	Well line near point screen Z, high byte, one per line
+PARTYV	Big Boom particle Y velocity, integer (signed)
+LINSZL	Well line near point screen Z, low byte, one per line
+PARTZV	Big Boom particle Z velocity, integer (signed)
+LIFSXL	Well line far point screen X, low byte, one per line (LIFSXH high)
+LIFSZH	Well line far point screen Z, high byte, one per line
+LIFSZL	Well line far point screen Z, low byte, one per line
+LINEX	Well line point X world coordinate, one per line (16), from the well shape tables
+LINEZ	Well line point Z world coordinate, one per line (16), from the well shape tables
+SECOUM	Bookkeeping game up timer (seconds), middle byte. Counted by the IRQ
+SECOUH	Bookkeeping game up timer (seconds), high byte
+SECOPM	Bookkeeping game play timer (seconds), middle byte. Counted while in game timer mode
+SECOPH	Bookkeeping game play timer (seconds), high byte
+NGAMIH	Bookkeeping count of 1-player games, high byte (NGAMIL low)
+NGAME0	Third byte of the 1-player games count. Saved in EAROM, never referenced by name
+NGAM2H	Bookkeeping count of 2-player games, high byte (NGAM2L low)
+NGAM20	Third byte of the 2-player games count. Saved in EAROM, never referenced by name
+BOOKKE	End of the bookkeeping block BOOKKS-BOOKKE saved to EAROM (BOOKKE-BOOKKS = its length)
+NGAVGH	Average game time (play time / games) high byte, computed by the self-test bookkeeping page
+NGAVGZ	Third byte after NGAVGL/H. Only cleared (READMB stores 0 there)
+LINEZM	Z world coordinate of the point halfway between each well line and the next (LINEXM is X)
+INITAL	High score initials, 3 bytes per entry for the 8 high scores (top entry last). Top 3 kept in EAROM
+HRANKL	Score rank table (256 bytes): 41 2-byte then 58 3-byte BCD scores, lowest first. Low byte
+HRANKM	Score rank table, middle BCD byte of each entry (HRANKL+1)
+HRANKH	Score rank table, high BCD byte of each entry (HRANKL+2)
+HSCORL	High score table: last 8 entries of the rank table, 3-byte BCD, low bytes. Top score at +21
+HSCORM	High score table, middle BCD byte of each entry (HSCORL+1)
+HSCORH	High score table, high BCD byte of each entry (HSCORL+2)
+SWINFO	Info (scores, messages) sub-buffer switch: 2-byte JMPL in vector RAM pointing to BAINFO or BBINFO
+BAINFO	Info sub-buffer, area A (display list built here while area B is shown)
+BBINFO	Info sub-buffer, area B (display list built here while area A is shown)
+SWENEL	Enemy line (spikes) sub-buffer switch: JMPL pointing to BAENEL or BBENEL
+BAENEL	Enemy line sub-buffer, area A
+BBENEL	Enemy line sub-buffer, area B
+SWWELL	Well sub-buffer switch: JMPL pointing to BAWELL or BBWELL
+BAWELL	Well sub-buffer, area A
+BBWELL	Well sub-buffer, area B
+SWINVA	Invader sub-buffer switch: JMPL pointing to BAINVA or BBINVA
+BAINVA	Invader sub-buffer, area A
+BBINVA	Invader sub-buffer, area B
+SWSHOT	Shot (charges) sub-buffer switch: JMPL pointing to BASHOT or BBSHOT
+BASHOT	Shot sub-buffer, area A
+BBSHOT	Shot sub-buffer, area B
+SWNYMP	Nymph sub-buffer switch: JMPL pointing to BANYMP or BBNYMP
+BANYMP	Nymph sub-buffer, area A
+BBNYMP	Nymph sub-buffer, area B
+SWEXPL	Explosion sub-buffer switch: JMPL pointing to BAEXPL or BBEXPL
+BAEXPL	Explosion sub-buffer, area A
+BBEXPL	Explosion sub-buffer, area B
+SWCURS	Cursor (player) sub-buffer switch: JMPL pointing to BACURS or BBCURS
+BACURS	Cursor sub-buffer, area A
+BBCURS	Cursor sub-buffer, area B
+SWSTAR	Star field sub-buffer switch: JMPL pointing to BASTAR or BBSTAR
+BASTAR	Star field sub-buffer, area A
+BBSTAR	Star field sub-buffer, area B
+SCOBUF	RAM copy of the score/lives/high score template SCORES at $2F60, updated in place
+SCLEVEL	Level number JSRLs inside SCOBUF (SCLEVL offset). Blanked in attract, set to the wave number
+SCALE	RAM scale instruction at $2FFC called by the shrapnel pictures. SHRSCA writes scale and RTSL
+CHAR_0	Digit 0 character (source CHAR.0), same picture as the letter O (CHAR.O)
+CHAR_	Space character (source CHAR.): a blank 24-unit move then RTSL
+HALF	1/2 picture (digits 1 and 2 at scale 2), shown after the credits when a partial credit exists
+LIFEY	Player life picture with a yellow colour instruction first, then LIFE1. Used by the self-test lives display

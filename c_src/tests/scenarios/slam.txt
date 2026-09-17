@@ -1,0 +1,40 @@
+# slam - the slam (tilt) switch in attract, around two coins, and during a
+# coined game (M7).  Format: PASS PORT VALUE (tests/refrun.c --script).
+# IN1 ($0C00) bits active low: b0 right coin, b3 slam; idle $3F.  ALLPO2
+# buttons active high (b4 fire, b5 start 1).  Default option switches.
+#
+# Why it works (read from the ROM, not guessed):
+# - COIN65 in every IRQ ($CF4C): slam bit low sets the pre-coin slam timer
+#   S_LMTIM ($0C) = $F0; while it is non-zero it is decremented ($CF5B) and
+#   the mech's coin status S_CNSTT and post-coin timer S_PSTSL are cleared
+#   ($CF5D-$CF61).  A coin is only credited when S_PSTSL (set to $78 when the
+#   coin falls out, $CF87) runs down to zero, so a slam while the coin is in
+#   the mech or during that delay loses the coin.
+# - NONSTA ($C8EE): S_LMTIM non-zero -> JSR SSLAMS ($CCFA), which goes to
+#   FSNDON directly (the sound starts in attract too, unlike SNDON's starters).
+#   Nothing else reads S_LMTIM.
+#
+# With this oracle (refrun dumps): S_LMTIM runs ~10 passes after a release.
+#   100-105 slam, coin in at 101-104: lost (CRDT stays 0)
+#   300-304 coin, slam 305-308 inside the post-coin delay: lost (CRDT 0)
+#   500-504 coin, no slam: credited at 519 (CRDT 1)
+#   START 600, level 1 (FIRE 630), autofire + spin 3 from 700, slam 800-803
+#   during play (SSLAMS with QSTATUS game).  Run 1500 passes.
+100  in1    0x37    # slam
+101  in1    0x36    # slam + right coin
+104  in1    0x37    # coin out, slam still closed
+105  in1    0x3F    # slam open
+300  in1    0x3E    # right coin
+304  in1    0x3F
+305  in1    0x37    # slam during the post-coin delay
+308  in1    0x3F
+500  in1    0x3E    # right coin, no slam: credited
+504  in1    0x3F
+600  allpo2 0x20    # START 1
+603  allpo2 0x00
+630  allpo2 0x10    # FIRE: level 1
+633  allpo2 0x00
+700  allpo2 0x10    # autofire
+700  spin   3
+800  in1    0x37    # slam during play
+803  in1    0x3F

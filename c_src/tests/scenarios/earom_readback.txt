@@ -1,0 +1,9 @@
+# earom_readback - attract from a power-on with the EAROM image earom.txt
+# wrote (M9 batch B2, Gate E2 oracle leg).  No inputs.
+# Run: tests\refrun.exe --frames 600 --script tests\scenarios\earom_readback.txt
+#                       --earom-in tests\earom\earom.nv
+# Expected (confirmed on refrun dumps): the boot's REHIIN reads every group
+# with a good checksum (EABAD = 0); frame 0001's INITAL / HSCORL top three
+# and BOOKKS..BOOKKE-1 equal earom.txt's frame 2301 (its post-reset boot);
+# attract's EAUPD still clocks 35 EADAL writes, but no erase/write cycle
+# changes the chip: --earom-out of this run equals the input image.

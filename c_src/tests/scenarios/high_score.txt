@@ -1,0 +1,37 @@
+# high_score - play a one-player game to a high score and enter initials (M4).
+# Format: PASS PORT VALUE  (tests/refrun.c --script; 'spin' steps the spinner
+# nibble of ALLPOT by VALUE every pass).  ALLPO2 buttons active high
+# (b3 zap, b4 fire, b5 start 1).
+#
+# Why it works (read from the ROM, not guessed): with the blank EAROM the
+# boot read fails its checksum and INIINI fills all 8 high scores with
+# $01 $01 $01 = 10,101, so a score above 10,101 ranks.  RATE YOURSELF offers
+# levels 1-9 (HIRATE >= 4); level 5 (index 2) pays a 16,000 bonus (BONSCO
+# BONPTM/BONPTH $0160) when its wave is completed.  Holding FIRE (SWSTAT
+# autofire) while spinning slowly clears wave 5 with this oracle; the game
+# then ends (score 022008), HISCHK ranks the player 1st, PRBOOM runs and
+# GETINI takes three FIRE presses, then WRHIIN (rank < 4) writes the table
+# to the EAROM (erase / write path of EAUPD).
+100  in1    0x3E    # coin (right mech)
+104  in1    0x3F
+300  allpo2 0x20    # START 1
+303  allpo2 0x00
+310  spin   0xFA    # RATE YOURSELF: cursor right to index 2 (level 5)
+322  spin   0
+330  allpo2 0x10    # FIRE: select level 5
+333  allpo2 0x00
+354  allpo2 0x10    # hold FIRE (autofire) for the whole game
+354  spin   2       # and spin slowly
+2000 allpo2 0x00    # initials entry (GETINI from pass ~1966): release FIRE
+2000 spin   0
+2010 allpo2 0x10    # first initial
+2013 allpo2 0x00
+2020 allpo2 0x10    # second initial
+2023 allpo2 0x00
+2030 allpo2 0x10    # third initial -> WRHIIN
+2033 allpo2 0x00
+# attract: switch on the 2-credit-minimum option (INOP1 b0; INILIT reads it
+# at the demo's NEWGAM), then one coin: NONSTA requests D2GAME
+2100 inop1  0x01
+2940 in1    0x3E
+2944 in1    0x3F

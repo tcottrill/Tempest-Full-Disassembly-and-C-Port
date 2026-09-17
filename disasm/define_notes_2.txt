@@ -1,0 +1,210 @@
+# define_notes_2.txt - descriptions for uncommented aliases LIFE0 .. CSUSTA in tempest_defines.asm
+# Format: NAME<TAB>description. Read by emit_defines.py. Evidence: ALxxxx.MAC sources, program and vector ROM listings.
+# PICLO offset = picture code (PITAB index x2) into the picture pointer table at $CEC8.
+LIFE0	Vector ROM: blank life slot, beam advance only. The score template holds 6 JSRL LIFE0 per player (SCP1LI, SCP2LI)
+LSYMBL	Vector ROM: a JSRL LIFE1 word that UPSCLI ($A9A9) copies into the score template to show one life symbol
+LSYMB0	Vector ROM: a JSRL LIFE0 word that UPSCLI ($A9B2) copies into the score template for an empty life slot
+INTEST	Vector ROM: self-test colour and intensity bars picture, drawn by SINTEN ($DB7E)
+HATCH	Vector ROM: self-test cross-hatch pattern followed by the alphabet, drawn by SHATCH ($DB84)
+CHEKER	Vector ROM: self-test grid of 15 horizontal and 11 vertical lines, drawn by SCHEKR ($DB78)
+HYSTER	Vector ROM: self-test hysteresis box picture, drawn by SHYSTE ($DBBD)
+EASING	Vector ROM: 'ERASING' message shown by the system display DSPSYS ($D87F) while the EAROM is being erased
+ROMRPI	Vector ROM: bad-ROM report frame (boundary, midline, text position) drawn by BADBOX ($DC7E) in self test
+VORBOX	Vector ROM: screen boundary rectangle entered after BONDRY's colour and scale. Used by BOXPRO logo box and SHYSTE
+EXPL1	Vector ROM picture: explosion frame 1 of 4 (smallest, 16 spokes), PICLO offset $00 (PTEXP1)
+EXPL2	Vector ROM picture: explosion frame 2 of 4, PICLO offset $02 (PTEXP1+2)
+EXPL3	Vector ROM picture: explosion frame 3 of 4, PICLO offset $04 (PTEXP1+4)
+EXPL4	Vector ROM picture: explosion frame 4 of 4 (largest), PICLO offset $06 (PTEXP1+6)
+DIARA2	Vector ROM picture: player shot, a diamond of dots of radius 2, PICLO offset $08 (PTCURS), drawn by DSPCHG
+STAR1	Vector ROM picture: warp star field frame 1 of 4, PICLO offset $0A (PTSTR1), selected by DSTARF
+STAR2	Vector ROM picture: warp star field frame 2 of 4, PICLO offset $0C (PTSTR1+2)
+STAR3	Vector ROM picture: warp star field frame 3 of 4, PICLO offset $0E (PTSTR1+4)
+STAR4	Vector ROM picture: warp star field frame 4 of 4, PICLO offset $10 (PTSTR1+6)
+SPIRA1	Vector ROM picture: green spiker (trailer) spiral frame 1 of 4, PICLO offset $12 (PTSPI1), chosen by TRAPIC
+SPIRA2	Vector ROM picture: green spiker (trailer) spiral frame 2 of 4, PICLO offset $14 (PTSPI1+2)
+SPIRA3	Vector ROM picture: green spiker (trailer) spiral frame 3 of 4, PICLO offset $16 (PTSPI1+4)
+SPIRA4	Vector ROM picture: green spiker (trailer) spiral frame 4 of 4, PICLO offset $18 (PTSPI1+6)
+TANKR	Vector ROM picture: purple tanker carrying flippers, PICLO offset $1A (PTTANK), chosen via TANTAB
+SPARK1	Vector ROM picture: yellow shot-hit sparkle frame 1 of 2, PICLO offset $1C (PTSPAR)
+SPARK2	Vector ROM picture: yellow shot-hit sparkle frame 2 of 2, PICLO offset $1E (PTSPAR+2)
+ESHOT1	Vector ROM picture: enemy shot frame 1 of 4, PICLO offset $20 (PTESHO), animated by DSPCHG
+ESHOT2	Vector ROM picture: enemy shot frame 2 of 4, PICLO offset $22 (PTESHO+2)
+ESHOT3	Vector ROM picture: enemy shot frame 3 of 4, PICLO offset $24 (PTESHO+4)
+ESHOT4	Vector ROM picture: enemy shot frame 4 of 4, PICLO offset $26 (PTESHO+6)
+SPLAT1	Vector ROM picture: player-death splat, largest size (Atari TARGET SPLAT), PICLO offset $32
+SPLAT2	Vector ROM picture: player-death splat size 2 of 6 (sets scale then JSRL SPLAT), PICLO offset $30
+SPLAT3	Vector ROM picture: player-death splat size 3 of 6, PICLO offsets $2E and $34
+SPLAT4	Vector ROM picture: player-death splat size 4 of 6, PICLO offset $2C
+SPLAT5	Vector ROM picture: player-death splat size 5 of 6, PICLO offsets $2A and $36
+SPLAT6	Vector ROM picture: player-death splat, smallest (SMALL SPLAT), PICLO offsets $28 (PTSPLA) and $38
+SPLFU1	Vector ROM picture: fuseball-kills-player explosion frame 1 of 7 (white star burst), PICLO offset $3C
+SPLFU2	Vector ROM picture: fuseball-kills-player explosion frame 2 of 7 (white), PICLO offset $3E
+SPLFU3	Vector ROM picture: fuseball-kills-player explosion frame 3 of 7 (yellow), PICLO offset $40
+SPLFU4	Vector ROM picture: fuseball-kills-player explosion frame 4 of 7 (yellow), PICLO offset $42
+SPLFU5	Vector ROM picture: fuseball-kills-player explosion frame 5 of 7 (red), PICLO offset $44
+SPLFU6	Vector ROM picture: fuseball-kills-player explosion frame 6 of 7 (red), PICLO offset $46
+SPLFU7	Vector ROM picture: fuseball-kills-player explosion frame 7 of 7 (blue), PICLO offset $48
+SHRAP	Vector ROM picture: yellow player-death shrapnel pieces placed via the vector RAM SCALE list, PICLO offset $3A
+FUSE0	Vector ROM picture: fuseball animation frame 0 of 4, PICLO offset $4E (PTFUSE), chosen at $B6EC
+FUSE1	Vector ROM picture: fuseball animation frame 1 of 4, PICLO offset $50 (PTFUSE+2)
+FUSE2	Vector ROM picture: fuseball animation frame 2 of 4, PICLO offset $52 (PTFUSE+4)
+FUSE3	Vector ROM picture: fuseball animation frame 3 of 4, PICLO offset $54 (PTFUSE+6)
+FUSEX1	Vector ROM picture: fuseball kill score '750', PICLO offset $56 (PTFUSX)
+FUSEX2	Vector ROM picture: fuseball kill score '500', PICLO offset $58 (PTFUSX+2)
+FUSEX3	Vector ROM picture: fuseball kill score '250', PICLO offset $5A (PTFUSX+4)
+JSRDOT	Vector ROM: a JSRL JADOT word that WHITIP ($C72D) copies into vector RAM to draw a white dot at a tip
+SWNORM	Vector ROM: play master display list, JSRL every vector RAM sub-buffer then JMPL VECRAM. First JMPMAL entry
+SWMSGS	Vector ROM: messages-only master display list (JSRL SWINFO, JMPL VECRAM). Second JMPMAL entry
+SWHALT	Vector ROM: master display list that just halts the vector generator. Third JMPMAL entry
+BOKLIT	Vector ROM: bookkeeping screen literals (seconds on, games played, averages), drawn by DBOOKE ($DD7E)
+SYSOPT	Vector ROM: .WORD table of self-test option literal pictures (ENTEST, ZTIMES, ZHISCO, ZMED, ZEASY, ZHARD) for DSPSYS
+VORLIT	Vector ROM: the TEMPEST logo letters (TEMLIT), drawn as the approaching logo rainbow by LOGPRO ($B131)
+KILLER	Vector ROM: beam killer, blank vectors to the screen corners. VGJSRL'd by ZATC1S ($B1AF) and DSBOOM ($B8BA)
+SPACG	Assembly switch = 0 that suppresses the space game code (.IF NE,SPACG blocks) in ALCOMN, ALDIS2 and ALVROM
+NRANKS	Highest rank number (99). Rank display ONERNK caps at it and hi score ranking compares against it
+CNEWGA	Game state code $00 (QSTATE, ROUTAD index): NEWGAM, start a new game. MAINLN sets it at power up
+CNEWLI	Game state code $02 (QSTATE, ROUTAD index): NEWLIF, new life setup after losing a base
+CPLAY	Game state code $04 (QSTATE, ROUTAD index): PLAY, normal game play
+CENDLI	Game state code $06 (QSTATE, ROUTAD index): ENDLIF, life lost. Set at $A563
+CENDGA	Game state code $08 (QSTATE, ROUTAD index): ENDGAM, end of game. Set at $90B1
+CPAUSE	Game state code $0A (QSTATE, ROUTAD index): PAUSE, wait for the QTMPAUS timer then go to QNXTSTA
+CNEWAV	Game state code $0C (QSTATE, ROUTAD index): new wave. Its ROUTAD entry is $0000 and nothing sets it
+CENDWAV	Game state code $0E (QSTATE, ROUTAD index): ENDWAV, end of wave (initialise space mode). Set at $9827
+CHISCHK	Game state code $10 (QSTATE, ROUTAD index): HISCHK, check for high scores. Set at $CA13
+CDLADR	Game state code $14 (QSTATE, ROUTAD index): DLADR, display the high score table (ladder)
+CGETINI	Game state code $12 (QSTATE, ROUTAD index): GETINI, get high score initials. Set at $A656
+CNOTFOU	Same value as CDLADR ($14): state INTLDR loads when no player needs initials or the entry timer runs out
+CREQRAT	Game state code $16 (QSTATE, ROUTAD index): PRORAT, request player rate (skill level select). Set at $9133
+CNEWV2	Game state code $18 (QSTATE, ROUTAD index): NEWAV2, new wave part 2 (zoom). Score display tests it for starfield messages
+CINIRAT	Game state code $1C (QSTATE, ROUTAD index): INIRAT, initialise the rate request (monster delay and display)
+CNWLF2	Game state code $1E (QSTATE, ROUTAD index): NEWLF2, new life part 2. ALDIS2 then centres the well Z at once
+CSYSTM	Game state code $22 (QSTATE, ROUTAD index): SYSTEM, self-test system info display. NONSTA sets it when MTEST is on
+PARLYA	Boom particle deceleration, Y fractional part ($20). Defined in ALCOMN BOOM section, unused by rev 3 code
+PARLZA	Boom particle deceleration, Z fractional part ($20). Defined in ALCOMN BOOM section, unused by rev 3 code
+PARTYA	Boom particle deceleration, Y integer part (0). Defined in ALCOMN BOOM section, unused by rev 3 code
+PARTZA	Boom particle deceleration, Z integer part (0). Defined in ALCOMN BOOM section, unused by rev 3 code
+LEDOFF	MLED1 or MLED2 ($03), written by the self test at $D8F0 to turn the start LEDs off
+NROMS	Number of program ROMs checksummed by the self test (12). Sizes the CHKSMS array and the BADBOX report loop
+BLUE	Colour RAM index 6, the blue well colour (WELCOL). Also blue stars in waves 1-4. ALVROM uses BLUE=7 locally
+BLULET	Colour RAM index 7, blue for letters. Used for blue messages (MCMLXXX ATARI, APPROACH, NEW SUPER)
+GREEN	Colour RAM index 5, green. Letters (LETCOL) and trailers (TRACOL)
+RED	Colour RAM index 3, red. Invaders (INVCOL) and flippers (FLICOL)
+YELLOW	Colour RAM index 1, yellow. Cursor (CURCOL) and player shots (PCHCOL)
+WHITE	Colour RAM index 0, white. Explosions, enemy shots and super zap. Also the pulse-on spoke colour
+PURPLE	Colour RAM index 2, purple. Tankers (TANCOL)
+TURQOI	Colour RAM index 4, turquoise. Pulsars and the pulse-off spoke colour
+DEPCOL	Equated to WELCOL (colour RAM index 6) in ALCOMN. Not referenced by the rev 3 code
+FRED	Colour RAM value $0C (active low, b0 and b1 clear): red gun on. ANDed to build the Z colour values
+FBLUE	Colour RAM value $0B (active low, b2 clear): blue gun on. ANDed to build the Z colour values
+FGREEN	Colour RAM value $07 (active low, b3 clear): green gun on. ANDed to build the Z colour values
+HRED	Colour RAM value $0D (active low, only b1 red clear, red-low off). Defined in ALCOMN, not referenced
+ZWHITE	Colour RAM value $00 (all guns on), white. Used in the COLTAB wave colour sets
+ZYELLO	Colour RAM value $04 (red and green), yellow. COLTAB entry and the plenty-of-shots indicator colour
+ZPURPL	Colour RAM value $08 (red and blue), purple. Used in the COLTAB wave colour sets
+ZRED	Colour RAM value $0C (red), red. COLTAB entry, splat colour (ALTCOL) and the out-of-shots indicator
+ZTURQOI	Colour RAM value $03 (green and blue), turquoise. Used in the COLTAB wave colour sets
+ZGREEN	Colour RAM value $07 (green), green. Used in the COLTAB wave colour sets
+ZBLUE	Colour RAM value $0B (blue), blue. COLTAB well colour and the low-shots indicator colour
+ZBLACK	Colour RAM value $0F (all guns off), black. COLTAB uses it at $C223 for the well colour of one wave set
+PDIYEL	Colour RAM index 10, player death explosion yellow. ALTCOL ($B868) loads ZYELLO into it
+PDIRED	Colour RAM index 11, player death explosion red. ALTCOL ($B861) loads ZRED into it
+MECHS	Number of coin mechanisms (3) for the COIN65 coin routine. Sizes $CNSTT and $PSTSL
+EMCTRS	Number of electromechanical coin counters (3) for COIN65. Sizes $CCTIM
+NPLANE	Number of star field planes (8). Size of PLANEY
+NINVAD	Number of invader slots (7). Size of INVAC1, INVAC2, INVCAM and the other invader tables
+NLINES	Number of well lines and spokes (16). Size of the enemy line (spike) tables LINSXH and others
+NNYMPH	Number of nymph slots (64), the enemies waiting to emerge. Size of NYMPL and NYMPY
+NPCHARG	Number of player shot slots (8). They come first in the charge tables. Size of CHARCO
+NICHARG	Number of enemy shot slots (4), after the player shots in the charge tables
+NCHARG	Total charge (shot) slots, NPCHARG+NICHARG = 12. Size of CHARL1, CHARL2, CHARY, CHARYL
+NEXPLO	Number of explosion slots (8). Size of EXPLX, EXPLY, EXPLZ, EXPLPI
+ILINDDY	Y position $F0 at the far (bottom) end of the well. Objects start there and it is the end of a descent
+ILINLIY	Y position $10 at the near rim (top) of the well where the player's cursor sits
+INVABI	INVAC1 mask $07: invader appearance code (0 flipper, 1 pulsar, 2 tanker, 3 trailer, 4 fuse)
+INVSEQ	INVAC1 mask $18: invader animation sequence bits (read at $B5C2)
+INVMOT	INVAC1 mask $80: motion flag, 1 while the invader is flipping or leaping (ZMOTJM)
+INVROT	INVAC1 mask $40: rotation direction of a flip, 0 clockwise and 1 counter-clockwise
+ZROCCW	INVAC1 rotation value $40 (INVROT set): flipping counter-clockwise
+INVCAR	INVAC2 mask $03: what a tanker carries (0 nothing, 1 flippers, 2 pulsars, 3 fuses)
+ZFIRNO	INVAC2 firepower value 0: invader does not fire. Used in the TNEWI2 new-invader table
+ZFIRYE	INVAC2 firepower value $40 (INVFIR): invader may fire. Used in skill tables and TNEWI2
+ZDIRUP	INVAC2 direction value 0: invader moving up the well. Used in TNEWI2
+ZDIRDO	INVAC2 direction value $80 (INVDIR): invader moving down. ORed in at $9FF0 to send it down
+RATS	Beam intensity $C0 loaded into VGBRIT for well spokes, rim lines and depth-cued line pictures
+DG000	Jumper world offset $2C for 0 degrees, first byte of JUMPX in the flipper jump coordinate tables ($B68B)
+CPSPXI	Special explosion start index -1 (SPXIND) for a charge hitting the player: splat sequence from TSPTIM index 0
+PPSPXI	Special explosion start index 7 (PPSTART-TSPTIM-1) for a pulsar killing the player. Loaded at $A347
+FPSPXI	Special explosion start index 9 (FPSTART-TSPTIM-1) for a fuse killing the player (SPLFU pictures). Loaded at $A343
+DG0	Circle well coordinate $F0 (angle 0, $70+$80), in the NEWLIX ($B97C) and NEWLIZ ($BA7C) well shape tables
+DI0	Square well coordinate $F0 (outer edge), in the NEWLIX ($B98C) and NEWLIZ ($BA8C) tables
+DI1	Square well coordinate $B8, in the NEWLIX and NEWLIZ well shape tables
+DI2	Square well coordinate $80 (centre), in the NEWLIX and NEWLIZ well shape tables
+DI3	Square well coordinate $48, in the NEWLIX and NEWLIZ well shape tables
+DI4	Square well coordinate $10 (opposite edge), in the NEWLIX and NEWLIZ well shape tables
+CR0	Cross well coordinate $F0 ($70+$80), in the NEWLIX ($B99C) and NEWLIZ ($BA9C) well shape tables
+CR1	Cross well coordinate $F0 ($70+$80), in the NEWLIX and NEWLIZ well shape tables
+CR2	Cross well coordinate $B8 ($38+$80), in the NEWLIX and NEWLIZ well shape tables
+CR3	Cross well coordinate $B8 ($38+$80), in the NEWLIX and NEWLIZ well shape tables
+CR4	Cross well coordinate $80 (centre), in the NEWLIX and NEWLIZ well shape tables
+PX0	Peanut well X coordinate $EC ($6C+$80), in NEWLIX at $B9AC
+PX1	Peanut well X coordinate $D5 ($55+$80), in NEWLIX at $B9AC
+PX2	Peanut well X coordinate $B1 ($31+$80), in NEWLIX at $B9AC
+PX3	Peanut well X coordinate $90 ($10+$80), in NEWLIX at $B9AC
+PZ0	Peanut well Z coordinate $94 ($14+$80), in NEWLIZ at $BAAC
+PZ1	Peanut well Z coordinate $B0 ($30+$80), in NEWLIZ at $BAAC
+PZ2	Peanut well Z coordinate $B8 ($38+$80), in NEWLIZ at $BAAC
+PZ3	Peanut well Z coordinate $A7 ($27+$80), in NEWLIZ at $BAAC
+CINVA1	Line picture number 0 (PCOUNT and PINDEX index): the flipper (INVADER 1). Used by FLITAB and at $B605
+CNCURS	Line picture number 1: base of the 8 player cursor pictures NCRS1-NCRS8. ADCed with the cursor position at $B5A7
+CPULS4	Line picture number 9: pulsar picture PULS4. Last entries of PULTAB
+CPULS3	Line picture number 10: pulsar picture PULS3, in PULTAB
+CPULS2	Line picture number 11: pulsar picture PULS2, in PULTAB
+CPULS1	Line picture number 12: pulsar picture PULS1, in PULTAB
+CPULS0	Line picture number 13: pulsar picture PULS0, first entry of PULTAB
+EAERAS	EAROM request bit D7 = erase then write. Default request in the EAROM handler at $DE3A and $DE8E
+EAWRIT	EAROM request bit D6 = write. Loaded at $DE82
+EAREAD	EAROM request bit D5 = read. Loaded at $DE44
+QCHKS2	ROM checksum balance byte (ALHAR2), assembled as CHKSM2 at $9008 in ALWELG
+QCHKS3	ROM checksum balance byte (ALHAR2), assembled as CHKSM3 at $9D05 in ALWELG
+QCHKS4	ROM checksum balance byte (ALHAR2), assembled as CHKSM4 at $A462 in ALWELG
+QCHKS5	ROM checksum balance byte (ALHAR2), assembled as CHKSM5 at $A8AF in ALWELG
+QCHKS6	ROM checksum balance byte (ALHAR2), assembled as CHKSM6 at $B497 in ALDIS2
+QCHKS7	ROM checksum balance byte (ALHAR2), assembled as CHKSM7 at $BCFC in ALDIS2
+QCHKS8	ROM checksum balance byte (ALHAR2), assembled as CHKSM8 at $C472 in ALDIS2
+QCHKS9	ROM checksum balance byte (ALHAR2), assembled as CHKSM9 at $CCAF in ALSOUN
+QCHKSA	ROM checksum balance byte (ALHAR2), assembled as CHKSMA at $D703 in ALHAR2
+QCHKSB	ROM checksum balance byte (ALHAR2), assembled as CHKSMB at $DDDC in ALTES2
+ZATLIC	Length of the MCMLXXX ATARI literal (ZATLIE-ZATLIS). Loop count for the ZATLIV tamper check into QT1
+ITIMHI	Start value ($60) of TIMHIS, the high score initials entry timer (counted down every 32 frames)
+CBLANK	Character code 26, a blank initial. Fills the initials when a new high score entry is prepared
+ZATC4C	Length of the ZATC4S-ZATC4E code (copyright and credits MSGS calls). Loop count for the ZATC4V check into QT2
+FARINC	Step (8) added to NEARY each frame in BOXPRO, the logo shrinking box rainbow
+NCHANL	Number of sound half-channels (16, frequency and control for 8 POKEY channels). Sizes POINT, CURRENT, FRAMES, COUNT
+AUDCV	Value (0) written to POKEY 1 AUDCTL by the sound initialisation at $CDD3
+AUDCV2	Value (0) written to POKEY 2 AUDCTL (AUD2CT) by the sound initialisation at $CDD8
+MBCOND	Self-test result byte $78 (CBUF1): bad Mathbox flag, set at $DC17
+RAMCND	Self-test result byte $79: bad RAM report, set by BRAMREP at $D8CD
+PK1CND	Self-test result byte $7A: bad POKEY 1 flag, set at $DA51
+PK2CND	Self-test result byte $7B: bad POKEY 2 flag, set at $DA60
+EARCND	Self-test result byte $7C: bad EAROM flag, set at $DA6C and $DB68
+CHKSMS	Self-test array at $7D of NROMS ROM checksums, stored at $DA27 and reported by BADBOX
+BCINFO	Vector RAM sub-buffer code 0: information (scores, messages). Index into BUFASL, BUFBSL, BUFSWL and JMPALO
+BCENEL	Vector RAM sub-buffer code 1: enemy lines (spikes). Index into the sub-buffer pointer tables
+BCWELL	Vector RAM sub-buffer code 2: the well. Index into the sub-buffer pointer tables
+BCINVA	Vector RAM sub-buffer code 3: invaders. Index into the sub-buffer pointer tables
+BCSHOT	Vector RAM sub-buffer code 4: shots (charges). Index into the sub-buffer pointer tables
+BCNYMP	Vector RAM sub-buffer code 5: nymphs. Index into the sub-buffer pointer tables
+BCEXPL	Vector RAM sub-buffer code 6: explosions. Index into the sub-buffer pointer tables
+BCCURS	Vector RAM sub-buffer code 7: player cursor. Index into the sub-buffer pointer tables
+BCSTAR	Vector RAM sub-buffer code 8: star field. Index into the sub-buffer pointer tables
+ZEASY	Difficulty option code 1 (OPTIN3 bits 0-1) = easy: fewer enemy shots, slower. Tested at $932D
+ZHARD	Difficulty option code 2 (OPTIN3 bits 0-1) = hard: more enemy shots (up to 3), faster. Tested at $934D
+PN	Value 40 in the TPUCHDE pulsar chase delay skill table (waves 17-32, alternating with PC)
+PC	Value 20 in the TPUCHDE pulsar chase delay skill table (waves 17-32, alternating with PN)
+CPTYPE	Explosion type code 1: the player's cursor destroyed. Loaded at $A350 before DEADCU
+CCTYPE	Explosion type code 0: a player shot hits an enemy shot (INCCSQ at $A37C)
+CITYPE	Explosion type code 0: a player shot kills an invader (INCISQ at $A3B1)
+CFTYPE	Explosion type code base 2 for a fuse kill. A random 0-2 (250, 500, 750 points) is added at $A327
+CSUMAX	Superzapper uses allowed per wave (2). PROSUZ compares SUZCNT against it
+CSUINT	Superzapper kill interval mask (1): KILENE kills one enemy on every other SUZTIM frame
+CSUSTA	SUZTIM value (3) at which the superzapper starts killing. TIMAX gives 19 frames for zap 1 and 5 for zap 2

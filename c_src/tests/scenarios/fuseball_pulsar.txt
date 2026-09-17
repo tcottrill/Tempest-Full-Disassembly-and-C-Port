@@ -1,0 +1,59 @@
+# fuseball_pulsar - two free-play games started at wave 24, where pulsars and
+# fuseballs are both on the well (M7).  Format: PASS PORT VALUE
+# (tests/refrun.c --script; 'spin' steps the ALLPOT spinner nibble by VALUE
+# every pass).  ALLPO2 buttons active high (b3 zap, b4 fire, b5 start 1).
+#
+# Why it works (read from the ROM, not guessed):
+# - Option switch N13 = INOP0 ($0D00) = $42: "Free Play" (b1-b0 = 10) plus
+#   bonus-coins b7-b5 = 010 ("1 each 4 (+Demo)" in tempest.cpp).  INILIT
+#   ($D6CC) stores INOP0 EOR 2 = $40 into OPTIN1 = $CMODE ($09) at the attract
+#   NEWGAM of pass 1 (dump: OPTIN1 $40 from pass 2).  Coin mode OPTIN1 & 3 = 0
+#   is free play: NONSTA's NOSTART ($C8D9) keeps CRDT at 2 in attract, and
+#   COIN65's S_CNVRT ($CFE1) converts nothing.
+# - INIRA0 ($90EA): OPTIN1 & $43 == $40 is "SALES MODE? ANYTHING GOES", so
+#   HIRATE = $1B and RATE YOURSELF offers every LEVEL table entry ($91FE:
+#   index 11 = $17 = wave 24).  The same test makes HISCHK ($AC45) clear the
+#   scores at game end and LINER ($A5BF) abort the wave on START (not used
+#   here: a START drop with enemies on the well dies).  EXSTAT's freeze test
+#   ($C7BD, INOP0 & $83 == $82) stays off.
+# - Wave tables (rev 3 = ALWELG.MAC): WPULMI $9520 two pulsars minimum on
+#   waves 17-32, WFUSMI $9541 one fuseball on waves 11-16, 22-25, 27+;
+#   TPUCHDE (19-32) and TWFUSC (17-32) are TR records (DOTR).  Wave 24 is
+#   CURWAV $17 (a V well, planar, so fuseballs can reverse at the edge:
+#   GOTJUM/REVFLP), wave 25 CURWAV $18 (stairs).
+# - Level select: spin $FA moves the cursor (GETCUR) one index per ~5 passes;
+#   FIRE takes CURSL1 = 11 into BONUS ($0102).
+#
+# Blind play with this oracle (dumps of refrun --capture-every 1):
+# game 1 (START 300, wave 24 from pass 392): autofire + spin $FE; fuseball
+#   shot (INCFS2, +250) at ~693, pulsar kills the player on its lane (L9D01
+#   INPPSQ, SPXIND 8 -> SETSHR, 9 -> SHRSCA) at ~870; spin 3 from 925: a
+#   fuseball kills the player (L9E58 INFPSQ, SPXIND $0A) at ~1683, game over
+#   1747 (HISCHK clears the score).
+# game 2 (START 1850, wave 24 from 1942): autofire, spin 3 then $FE: wave 24
+#   cleared at 3100, ENDWAV pays BONSCO index 11 = 188,000 (SAUSON) and the
+#   20,000 bonus life (GIVBON SAUSON); score 192,905, so ZQPONS ($C5B1) runs
+#   with LSCORH >= $15 but QT5 = 0 (genuine POKEY).  Wave 25 (spin 2 from
+#   3200; with it REVFLP $9FB4 runs), game over 3712.  Run 4000 passes.
+1    inop0  0x42    # free play + "demo" bonus-coin setting -> sales mode
+300  allpo2 0x20    # START 1 (free play: CRDT 2)
+303  allpo2 0x00
+320  spin   0xFA    # RATE YOURSELF: cursor right to index 11 (wave 24)
+380  spin   0
+390  allpo2 0x10    # FIRE: select wave 24
+393  allpo2 0x00
+420  allpo2 0x10    # autofire
+420  spin   0xFE
+925  spin   3       # third life: fuseball death
+1760 allpo2 0x00    # attract
+1760 spin   0
+1850 allpo2 0x20    # START 1: second game
+1853 allpo2 0x00
+1870 spin   0xFA    # index 11 again
+1930 spin   0
+1940 allpo2 0x10    # FIRE: wave 24
+1943 allpo2 0x00
+1970 allpo2 0x10    # autofire
+1970 spin   3
+2500 spin   0xFE    # clears wave 24 (bonus 188,000)
+3200 spin   2       # wave 25

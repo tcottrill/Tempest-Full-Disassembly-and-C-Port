@@ -1,0 +1,59 @@
+# selftest_midrun - a short coined game, then the TEST switch in attract:
+# SYSTEM/DSPSYS options (EAZHIS, EAZBOO), leave while the EAROM is erasing,
+# TEST again and the option that does JMP RESET with the switch still closed
+# (power-on self test over live RAM), then the watchdog reboot (M9 batch B2).
+# Run: tests\refrun.exe --frames 2500 --script tests\scenarios\selftest_midrun.txt
+# Syntax: tests\scenarios\README_selftest.md.
+#
+# Why it works (read from the listing, confirmed on refrun dumps):
+# - 100-602: coin_start's inputs: one credit, START 1, level select; the
+#   player sits still until game over (~1216).  Bookkeeping (games, play
+#   time) is non-zero for DBOOKE's BCD and READMB's divide; WRBOOK writes.
+# - NONSTA ($C891) sets QSTATE = CSYSTM ($22) every pass while IN1 b4 is low:
+#   SYSTEM ($D7E1) + DSPSYS ($D804).  Cursor = GINICO(CURSL1): CURSPO +=
+#   TBHD*8, carry steps CURSL1; the spinner is reversed, so "spin 4"
+#   DEcrements CURSL1 once per 8 passes, "spin 0xFC" increments it.
+#   Option = (CURSL1 & 6) / 2 = X; fired when SWSTAT has both OPTMSK,X bits;
+#   then DEX DEX: X = 0 or 1 -> JMP RESET (FIRE+ZAP), X = 2 -> EAZBOO
+#   (FIRE+START1), X = 3 -> EAZHIS + EABAD |= 3 (FIRE+START2).
+#   (The M9 survey's "1 = EAZBOO, 2/3 = EAZHIS" is off by one option.)
+# - 1400 test 1: CURSL1 = $0F here (X = 3): FIRE+START2 at 1420 -> EAZHIS.
+#   spin 4 for 16 passes -> CURSL1 $0D (X = 2): FIRE+START1 at 1470 -> EAZBOO.
+# - 1490 test 0 while erasing: NONSTA no longer sets CSYSTM but QSTATE stays
+#   $22; SYSTEM waits for EAFLG = 0 (pass 1516), then QSTATE = CNEWGA and
+#   INIINI (EABAD & 3 set) -> attract.  The erase/rewrite ends by ~1608.
+# - 1900 test 1: CURSL1 = $0D; spin 0xFC for 24 passes -> $10/$11 (X = 0);
+#   FIRE+ZAP at 1970 -> LD861 JMP RESET with TEST closed: power-on self test
+#   over live RAM, good EAROM -> diag loop at QSTATE 2 (pass 1971); diag
+#   step at 2100 -> SHATCH; test 0 at 2150 -> WDGTST -> watchdog -> attract
+#   from pass 2151 to 2500.
+# Fragile by nature: the cursor positions depend on CURSL1 as attract left
+# it; re-derive from the dumps ($0200) if the hardware model changes.
+100  coinr 1       # right coin
+104  coinr 0
+300  start1 1      # START 1
+303  start1 0
+600  fire 1        # level select
+602  fire 0
+1400 test 1        # SYSTEM / DSPSYS
+1420 fire 1        # CURSL1 $0F (option 3): EAZHIS
+1420 start2 1
+1426 fire 0
+1426 start2 0
+1440 spin 4        # CURSL1 -> $0D (option 2)
+1456 spin 0
+1470 fire 1        # EAZBOO
+1470 start1 1
+1476 fire 0
+1476 start1 0
+1490 test 0        # leave while erasing: SYSTEM waits for EAFLG
+1900 test 1        # SYSTEM / DSPSYS again
+1920 spin 0xFC     # CURSL1 $0D -> $10 (option 0)
+1944 spin 0
+1970 fire 1        # FIRE+ZAP: JMP RESET with TEST closed -> self test
+1970 zap 1
+1976 fire 0
+1976 zap 0
+2100 diag 1        # -> SHATCH
+2110 diag 0
+2150 test 0        # WDGTST -> watchdog reboot -> attract

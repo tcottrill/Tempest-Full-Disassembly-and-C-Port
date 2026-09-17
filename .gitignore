@@ -1,0 +1,53 @@
+# ROM images are not distributed.  Supply your own MAME tempest set and
+# regenerate everything with disasm/gen_from_roms.py (see disasm/README.md).
+roms/
+disasm/build/
+disasm/_survey/roms_extracted/
+*.bin
+
+# Atari's source archive (github.com/historicalsource/tempest) and the 1999
+# Tempest Commented Source are not distributed either; the listings recovered
+# from them are.  Local copies here let the tools that read them run again.
+tempest-main/
+disasm/Tempest Commented Source.txt
+
+# Third-party assembler used for the --check round trip (cc65.github.io)
+cc65-win32/
+
+# Everything recorded from the running ROM - oracle dumps, lockstep traces,
+# AVG walks, the EAROM image - is not distributed; c_src/record_refs.bat
+# records all of it again, byte for byte.
+c_src/tests/ref/
+c_src/tests/ref_selftest/
+c_src/tests/gate/
+c_src/tests/avg_out/
+c_src/tests/earom/
+*.ram
+*.vram
+*.col
+*.trc
+frame_*.*
+
+# Python
+__pycache__/
+*.pyc
+
+# C port build output (the game's own exe is published)
+c_src/obj/
+*.exe
+!c_src/tempest_win.exe
+*.obj
+*.pdb
+*.ilk
+*.log
+*.out
+
+# NVRAM image written by tempest_win.exe (the EAROM contents): per machine
+*.nv
+
+# Local working files, kept out of the published tree
+Goal.txt
+tempest.cpp
+tempest.h
+publish_tree.ps1
+.claude/
