@@ -32,10 +32,13 @@ frame_*.*
 __pycache__/
 *.pyc
 
-# C port build output (the game's own exe is published)
+# Build output (the game's own exe and the emulator's are published)
 c_src/obj/
+emu_src/obj/
+emu_src/shots/
 *.exe
 !c_src/tempest_win.exe
+!emu_src/tempest_emu.exe
 *.obj
 *.pdb
 *.ilk

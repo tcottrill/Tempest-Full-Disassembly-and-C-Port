@@ -9,6 +9,12 @@ data**. Every constant, table and branch traces to a ROM address, every name
 is Atari's own identifier, and every behavioural question was settled by
 running the ROM, not by guessing.
 
+Beside the port sits its **emulator twin**, [`emu_src/`](emu_src/README.md):
+`tempest_emu.exe` runs the real program ROM (your own — none is included) on a
+6502 core behind the very same window, beam renderer, sound, controls and
+chip models as the port, so the original and the translation can be played
+side by side.
+
 
 ## The game, and every vector object in it
 
@@ -41,6 +47,7 @@ trace beside it.
 |-------|------|
 | [`disasm/`](disasm/README.md) | the disassembly: the program ROM and the colour AVG vector ROM as plain assembler source that re-encodes to the ROM byte for byte, a defines file carrying the memory map, the hardware registers and Atari's RAM variables, the shape preview above, and the Python tools that generate and verify all of it from a ROM set — among them `macasm.py`, an assembler for Atari's own source dialect |
 | [`c_src/`](c_src/README.md) | the C port: the whole 6502 program as C11, one file per Atari module; real AVG words built in a modelled 4K vector RAM; the Mathbox running its real bit-slice microcode; two real POKEYs and a real ER2055 EAROM behind the hardware seam; a Windows host (OpenGL beam renderer, XAudio2 sound, mouse / keyboard / joystick spinner, persistent high scores, the cabinet's own self test); the oracle, the call-by-call verifier and their scenario scripts; and a prebuilt **`tempest_win.exe`** with its **`tempest_win.ini`**. Builds with Visual Studio 2022, no external SDK |
+| [`emu_src/`](emu_src/README.md) | the emulator twin of the C port: the real ROM, loaded from a MAME `tempest` zip you supply (rev 1, 2 or 3, 2K or 4K chips), on the [AAE emulator](https://github.com/tcottrill/AAE)'s 6502 core — the only piece taken from AAE. Everything else is the port's own, compiled from `c_src` in place: the Windows host, `avg.c`, the Mathbox, the POKEYs, the EAROM, and the board model of the oracle. Same keys, same ini, same command line; a prebuilt **`tempest_emu.exe`** with its **`tempest_win.ini`** |
 | [`c_src/FINDINGS.md`](c_src/FINDINGS.md) | what the port proved and what it found: the six copy-protection checks, the wrong comments, the 61.5 Hz picture over a 27 Hz game loop, the verification techniques |
 | [`disasm/_survey/tempest_inputs.md`](disasm/_survey/tempest_inputs.md) | the survey the work started from: ROM sets, memory map, Atari's source dialect |
 
@@ -89,7 +96,10 @@ is verified call by call without them** — the ROM data the translated
 program reads is checked in as generated C files and compiled into
 `tempest_win.exe` and into the oracle — but the disassembly tools and the C
 data generators read real ROM images, and so do the three gates (V, S, E)
-that lean on the disassembly's build output.
+that lean on the disassembly's build output. The emulator in `emu_src`, which
+runs the ROM itself, has nothing to run without one: it looks for
+`emu_src\roms\tempest.zip`, then `roms\tempest.zip` at the top of the tree
+(`--roms FILE` names another), and says so and exits if there is none.
 
 Given a MAME `tempest` ROM set, one script builds the 64K working image and
 regenerates and verifies every listing:
@@ -119,6 +129,18 @@ already have). Keep `tempest_win.ini` beside it; the host writes
 `tempest_win.log` there and keeps the high scores and bookkeeping in
 `tempest.nv`, the EAROM's contents.
 
+The emulator is the same, from `emu_src`, once a ROM zip is in place:
+
+```bat
+cd emu_src
+build_emu.bat
+tempest_emu.exe
+```
+
+It keeps its own `tempest_win.ini`, `tempest_win.log` and `tempest.nv` in
+`emu_src`, so the two programs never share settings or high scores. The
+controls are the same for both:
+
 | control | keys |
 |---|---|
 | spinner | mouse; Left / Right; joystick X |
@@ -130,6 +152,13 @@ already have). Keep `tempest_win.ini` beside it; the host writes
 | diagnostic step / slam | F1 / F3 |
 | spinner tuning | `[` `]` mouse, Shift+`[` `]` keys |
 | mouse capture / fullscreen / quit | F8 / Alt+Enter / Esc |
+
+The self test is the cabinet's, and works as it does there. F2 during attract
+brings up the operator's options and bookkeeping screen, where the diagnostic
+step does nothing: **Fire + Zap** on that screen starts the self test, and
+then F1 (held for a moment) or F3 steps through its screens. `--test`, or
+`test_switch=1` in the ini, powers on straight into the self test. F2 again
+leaves it, through the watchdog reset the board uses.
 
 Every setting — option switches, pacing, the beam renderer, input, sound —
 is described in [`c_src/README.md`](c_src/README.md#tempest_winini), along
@@ -293,7 +322,10 @@ the POKEY file is translated from the AAE emulator's engine-free POKEY core;
 its pot scanner follows the Altirra Hardware Reference (Avery Lee), and its
 RANDOM chain is a gate-level transcription of Atari's schematics (Nick
 Mikstas's atari_pokey). The vendored framework files in
-`c_src/platform/windows/` keep their own headers and their own terms. The
+`c_src/platform/windows/` keep their own headers and their own terms, and so
+do the files in `emu_src/cpu/`: the 6502 core is the AAE emulator's, released
+under The Unlicense, with its credits (Neil Bradley, MAME's ADC/SBC by
+Juergen Buchmueller, FakeNes) in its header. The
 names and comments recovered from Atari's source archive remain Atari's, and
 the `[CS]` remarks remain their authors', quoted under the OpenContent
 License; neither source is distributed here. Tempest is a trademark of its
