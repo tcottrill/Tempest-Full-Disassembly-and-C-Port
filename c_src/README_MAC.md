@@ -135,6 +135,7 @@ make -f Makefile.mac tools      # build gate, passcost, avgshapes, avgframe, avg
 make -f Makefile.mac gate       # record the 12 lockstep traces, replay each through gate
 make -f Makefile.mac passcost   # pass-cost observer + refit of app_loop.c's table
 make -f Makefile.mac avg        # avgtime + avgframe, and the Python AVG model comparison
+make -f Makefile.mac gatev      # Gate V: avgshapes vs the Python model's reference
 ```
 Run from a clean tree and passing:
 - `gate`: all 12 traces replay with every pass byte-identical (the C modules alone against the
@@ -150,6 +151,12 @@ Run from a clean tree and passing:
   The Python comparison needs `disasm/_survey/roms_extracted/tempest3_cpu64k.bin`, built from
   your own ROM set with `python3 disasm/gen_from_roms.py "<dir or tempest.zip>" --image-only`
   (gitignored; the target skips the comparison if it is absent).
+
+- `gatev` (Gate V): `avgshapes` renders all 168 vector-ROM shapes (4,394 segments) identically to
+  the reference, `GATE V: PASS`. The reference is built by `tools/avg_ref.py shapes` from Atari's
+  source archive (github.com/historicalsource/tempest), which this repo does not ship: unpack it
+  to `../tempest-main/tempest-main/` (gitignored) and build the 64K image as above. The target
+  stops with a message if either is missing.
 
 The tools open literal Windows paths, so `avg` runs them from a scratch directory of symlinks
 named like those paths (as `selftest` does). The traces and dumps are generated into
@@ -170,10 +177,6 @@ which is expected from timing.
 - Audio was checked by numbers (about 247 pushes a second, non-silent in a game), not by ear.
   A few underruns occur while the ring buffer primes at start.
 - Cocktail flip, non-default dips, fullscreen and window resize were not exercised.
-- **Gate V (`avgshapes`) is built but not run.** Its reference (`tools/avg_ref.py shapes`) is
-  generated from Atari's own source archive (`ALVROM.MAC`, github.com/historicalsource/tempest),
-  which this repo does not ship and which is not on this machine. `make -f Makefile.mac gatev`
-  runs it if you unpack the archive to `../tempest-main/tempest-main/`.
 - Gates S and E (`tools/gate_s.py`, `tools/gate_e.py`) were not run or ported.
 - No phosphor afterglow, no vsync control (each picture is presented as the core finishes
   it), BMP-only screenshots.
