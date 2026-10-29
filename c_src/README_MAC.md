@@ -136,6 +136,7 @@ make -f Makefile.mac gate       # record the 12 lockstep traces, replay each thr
 make -f Makefile.mac passcost   # pass-cost observer + refit of app_loop.c's table
 make -f Makefile.mac avg        # avgtime + avgframe, and the Python AVG model comparison
 make -f Makefile.mac gatev      # Gate V: avgshapes vs the Python model's reference
+make -f Makefile.mac gates      # Gates S and E (tools/gate_s.py, tools/gate_e.py)
 ```
 Run from a clean tree and passing:
 - `gate`: all 12 traces replay with every pass byte-identical (the C modules alone against the
@@ -158,6 +159,21 @@ Run from a clean tree and passing:
   to `../tempest-main/tempest-main/` (gitignored) and build the 64K image as above. The target
   stops with a message if either is missing.
 
+- `gates` (Gates S and E): `GATE S: PASS` (69 of 69 checks: self test, lockstep, coverage of every
+  ALTES2 routine and label, gate replay, the oracle's result cells, the native self test) and
+  `GATE E: PASS` (29 of 29: the EAROM power-cycle round trip between the ROM and the native build,
+  both ways, and the erase paths) - the same check counts upstream's README records. These scripts
+  launch `tests\lockstep.exe` etc. by Windows name and read `disasm/build`, so `make gates` runs them
+  unmodified in a scratch tree `build/mac/stage/`: symlinks with those names, freshly recorded
+  traces, a **copy** of `disasm/` whose `build/` is regenerated (no tracked file is touched) and a
+  copy of Atari's source archive. It needs your ROM set (`ROMSET=...`, default
+  `~/Documents/Emulation/MAME ROMs/tempest.zip`) and `../tempest-main/tempest-main/`. Two stand-ins,
+  both documented in the Makefile: `disasm/build/program.bin` is the ROM image's `$9000-$DFFF`
+  slice (upstream builds it with cc65, which is not installed; `verify.py` shows the listing equals
+  that slice, 20480 of 20480 bytes), and `tempest_selftest` runs behind a small wrapper because
+  its `--dump DIR` writes `DIR\name`. The `commented_src.py` step fails without the 1999
+  commented source and is tolerated (it only supplies comment text).
+
 The tools open literal Windows paths, so `avg` runs them from a scratch directory of symlinks
 named like those paths (as `selftest` does). The traces and dumps are generated into
 `build/mac/` (about 57 MB of traces) and are not distributed.
@@ -177,7 +193,6 @@ which is expected from timing.
 - Audio was checked by numbers (about 247 pushes a second, non-silent in a game), not by ear.
   A few underruns occur while the ring buffer primes at start.
 - Cocktail flip, non-default dips, fullscreen and window resize were not exercised.
-- Gates S and E (`tools/gate_s.py`, `tools/gate_e.py`) were not run or ported.
 - No phosphor afterglow, no vsync control (each picture is presented as the core finishes
   it), BMP-only screenshots.
 - The `.app` was run from the command line, not launched from Finder.

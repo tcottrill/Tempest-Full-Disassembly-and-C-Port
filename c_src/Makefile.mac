@@ -5,6 +5,7 @@
 #   make -f Makefile.mac gate       record the 12 lockstep traces, replay each through gate
 #   make -f Makefile.mac passcost   run the pass-cost observer and refit app_loop.c's table
 #   make -f Makefile.mac avg        avgtime + avgframe (vs the Python AVG model, if disasm image exists)
+#   make -f Makefile.mac gates      Gates S and E (tools/gate_s.py, gate_e.py) in a scratch tree
 #   make -f Makefile.mac gatev      Gate V (avgshapes); needs Atari's source archive, see below
 #   make -f Makefile.mac check      headless: skeleton + self-test + lockstep
 #   make -f Makefile.mac skeleton   build + run the boot/loop smoke test
@@ -188,9 +189,57 @@ gatev: $(OUT)/avgshapes
 	@mkdir -p $(OUT)/avg && python3 -I tools/avg_ref.py shapes $(OUT)/avg/avg_shapes_ref.txt
 	$(OUT)/avgshapes $(OUT)/avg/avg_shapes_ref.txt $(OUT)/avg/avg_shapes.html
 
+# ---- Gates S and E (tools/gate_s.py, tools/gate_e.py) ------------------------------------------
+# The scripts launch "tests\lockstep.exe" etc. by Windows name, read recorded "tests\gate\*.trc" and
+# need disasm/build (symbols.json, program_refs.json, program.bin).  So they run unmodified inside a
+# scratch tree $(OUT)/stage:
+#   stage/c_src   the tools, symlinks named like the Windows paths (and plain ones), freshly recorded
+#                 traces (recorded with the same "tests\scenarios\X.txt" script strings, which end up in
+#                 the trace header), the earom image
+#   stage/disasm  a COPY of ../disasm with build/ regenerated (so no tracked file is touched); the
+#                 commented_src.py step fails without the 1999 commented source (comments only) and is
+#                 tolerated; program.bin is the ROM image's $9000-$DFFF slice (what emit_ca65.py's
+#                 ca65 round trip must reproduce; cc65 is not needed)
+#   stage/tempest-main  a copy of Atari's source archive (see gatev)
+# tempest_selftest --dump DIR writes "DIR\name" (a Windows path), so it runs behind a wrapper that moves
+# those files into DIR/.
+ROMSET ?= $(HOME)/Documents/Emulation/MAME ROMs/tempest.zip
+
+$(OUT)/refrun: tests/refrun.c $(REF)/ref6502.c $(HW) er2055.c $(GEN)
+	@mkdir -p $(OUT)
+	$(CC) -O2 -std=c11 -w -include stddef.h -I. -I$(REF) tests/refrun.c $(HW) $(REF)/ref6502.c er2055.c -o $@
+
+gates: $(OUT)/lockstep $(OUT)/refrun $(OUT)/gate $(OUT)/tempest_selftest $(OUT)/refdumps/.stamp
+	@[ -f "$(ROMSET)" ] || { echo "gates: ROM set not found: $(ROMSET) (make ROMSET=...)"; exit 1; }
+	@[ -f ../tempest-main/tempest-main/ALVROM.MAC ] || { echo "gates: ../tempest-main/tempest-main/ALVROM.MAC not found (Atari's source archive, see gatev)"; exit 1; }
+	@set -e; A=$$(pwd)/$(OUT); R=$$A/stage; C=$$R/c_src; rm -rf $$R; \
+	mkdir -p $$C/tests/earom $$C/tests/gate $$C/tests/scenarios; \
+	cp -R ../disasm $$R/disasm; rm -rf $$R/disasm/build; cp -R ../tempest-main $$R/tempest-main; \
+	(cd $$R/disasm && python3 -I gen_from_roms.py "$(ROMSET)" > $$R/gen_from_roms.log 2>&1 || true); \
+	for f in symbols.json program_refs.json srclines.json; do [ -f $$R/disasm/build/$$f ] || { echo "gates: $$f was not generated, see $$R/gen_from_roms.log"; exit 1; }; done; \
+	python3 -I -c "d=open('$$R/disasm/_survey/roms_extracted/tempest3_cpu64k.bin','rb').read(); open('$$R/disasm/build/program.bin','wb').write(d[0x9000:0xE000])"; \
+	cp -R tools $$C/tools; \
+	for x in lockstep refrun gate; do ln -s $$A/$$x "$$C/tests\\$$x.exe"; ln -s $$A/$$x $$C/tests/$$x.exe; done; \
+	printf '%s\n' '#!/bin/sh' "$$A/tempest_selftest \"\$$@\"; rc=\$$?" 'd=""; prev=""' \
+	  'for a in "$$@"; do [ "$$prev" = "--dump" ] && d="$$a"; prev="$$a"; done' \
+	  'if [ -n "$$d" ]; then mkdir -p "$$d"; for f in "$$d"\\*; do [ -e "$$f" ] && mv "$$f" "$$d/$${f#"$$d"\\}"; done; fi' \
+	  'exit $$rc' > $$R/selftest_wrap.sh; chmod +x $$R/selftest_wrap.sh; \
+	ln -s $$R/selftest_wrap.sh "$$C/tests\\tempest_selftest.exe"; ln -s $$R/selftest_wrap.sh $$C/tests/tempest_selftest.exe; \
+	for f in tests/scenarios/*.txt; do b=$$(basename $$f); ln -s $$(pwd)/$$f "$$C/tests\\scenarios\\$$b"; ln -s $$(pwd)/$$f $$C/tests/scenarios/$$b; done; \
+	for f in $$A/refdumps/ref/frame_*; do ln -s $$f "$$C/tests\\ref\\$$(basename $$f)"; done; \
+	for f in $$A/refdumps/selftest/frame_*; do ln -s $$f "$$C/tests\\ref_selftest\\$$(basename $$f)"; done; \
+	cd $$C; rec() { n=$$1; shift; $$A/lockstep --no-dumps "$$@" --trace-out tests/gate/$$n.trc > $$R/rec_$$n.log; }; \
+	rec selftest_boot_1800 --frames 1800 --script 'tests\scenarios\selftest_boot.txt'; \
+	rec selftest_midrun_2500 --frames 2500 --script 'tests\scenarios\selftest_midrun.txt'; \
+	rec earom_2600 --frames 2600 --script 'tests\scenarios\earom.txt' --earom-out tests/earom/earom.nv; \
+	rec earom_readback_600 --frames 600 --script 'tests\scenarios\earom_readback.txt' --earom-in $$C/tests/earom/earom.nv; \
+	for t in tests/gate/*.trc; do ln -s $$C/$$t "tests\\gate\\$$(basename $$t)"; done; \
+	python3 -I tools/gate_s.py --work $$R/work_s > $$R/gate_s.out; tail -1 $$R/gate_s.out; \
+	python3 -I tools/gate_e.py --work $$R/work_e > $$R/gate_e.out; tail -1 $$R/gate_e.out
+
 check: skeleton selftest lockstep
 
 clean:
 	rm -rf $(OUT)
 
-.PHONY: all mac app tools gate passcost avg gatev skeleton selftest lockstep check clean
+.PHONY: all mac app tools gate passcost avg gatev gates skeleton selftest lockstep check clean
