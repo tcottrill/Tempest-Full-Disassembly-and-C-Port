@@ -75,7 +75,7 @@ selftest: $(OUT)/tempest_selftest $(OUT)/refdumps/.stamp
 	@for f in $(OUT)/refdumps/selftest/frame_*; do ln -s ../refdumps/selftest/$$(basename $$f) "$(OUT)/run/tests\\ref_selftest\\$$(basename $$f)"; done
 	cd $(OUT)/run && ../tempest_selftest
 
-# the ten scripted scenarios.  Self-test / EAROM: frames and options from tests/scenarios/README_selftest.md;
+# the twelve lockstep runs (ten scripted scenarios + two unscripted attract runs).  Self-test / EAROM: frames and options from tests/scenarios/README_selftest.md;
 # gameplay: frames from record_refs.bat.
 # earom writes the image that earom_readback reads; it goes under build/ (tests/earom/ does not exist).
 lockstep: $(OUT)/lockstep
@@ -91,6 +91,8 @@ lockstep: $(OUT)/lockstep
 	$(OUT)/lockstep --frames 3000 --no-dumps --script tests/scenarios/superzapper.txt
 	$(OUT)/lockstep --frames 4000 --no-dumps --script tests/scenarios/fuseball_pulsar.txt
 	$(OUT)/lockstep --frames 1500 --no-dumps --script tests/scenarios/slam.txt
+	$(OUT)/lockstep --frames 600 --no-dumps
+	$(OUT)/lockstep --frames 5000 --no-dumps
 
 check: skeleton selftest lockstep
 
