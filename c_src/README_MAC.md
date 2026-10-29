@@ -113,7 +113,10 @@ make -f Makefile.mac lockstep   # real ROM vs. translated C, call by call
 - `skeleton`: 100 passes of the real boot and loop, no watchdog trips.
 - `selftest`: 38 of 38 seam checks (boot, attract, a coined game with fire / zap / spin, EAROM
   round trip, watchdog reboots, the self-test screens against the ROM oracle's dumps).
-- `lockstep`: four scenarios, all PASS, 0 calls failed. `selftest_boot` 167338 calls compared
+- `lockstep`: ten scenarios, all PASS, 0 calls failed; the six gameplay ones (`coin_start`,
+  `high_score`, `two_player`, `superzapper`, `fuseball_pulsar`, `slam`) compare exactly the
+  call counts the upstream `README.md` records.
+  The self-test / EAROM four: `selftest_boot` 167338 calls compared
   (4 RESET regions, 348 MAINLN and 1450 DIAG passes); `selftest_midrun` 708398; `earom` 808812;
   `earom_readback` 221042. The image `earom_readback` writes back equals the one it read.
 
@@ -140,10 +143,9 @@ which is expected from timing.
 - Audio was checked by numbers (about 247 pushes a second, non-silent in a game), not by ear.
   A few underruns occur while the ring buffer primes at start.
 - Cocktail flip, non-default dips, fullscreen and window resize were not exercised.
-- Lockstep runs the four self-test / EAROM scenarios (`selftest_boot`, `selftest_midrun`,
-  `earom`, `earom_readback`); the gameplay scenarios in `tests/scenarios` (`coin_start`,
-  `two_player`, `superzapper`, ...) are not wired in. `gate`, `passcost` and the `avg*` frame
-  tests from `build_all.bat` are not ported.
+- Lockstep runs the ten scripted scenarios in `tests/scenarios`. The unscripted attract runs
+  (600 and 5000 frames), `gate`, `passcost` and the `avg*` frame tests from `build_all.bat`
+  are not ported.
 - No phosphor afterglow, no vsync control (each picture is presented as the core finishes
   it), BMP-only screenshots.
 - The `.app` was run from the command line, not launched from Finder.
