@@ -129,6 +129,32 @@ Porting notes (flags only, no core changes):
 - The oracle dumps those paths refer to are not checked in. The Makefile generates them with
   the real ROM run (`lockstep` is `refrun` plus the verifier) into `build/mac/refdumps/`.
 
+## More checks: gate, passcost, AVG walker
+```sh
+make -f Makefile.mac tools      # build gate, passcost, avgshapes, avgframe, avgtime
+make -f Makefile.mac gate       # record the 12 lockstep traces, replay each through gate
+make -f Makefile.mac passcost   # pass-cost observer + refit of app_loop.c's table
+make -f Makefile.mac avg        # avgtime + avgframe, and the Python AVG model comparison
+```
+Run from a clean tree and passing:
+- `gate`: all 12 traces replay with every pass byte-identical (the C modules alone against the
+  ROM's recorded state), and the attract trace's images equal the oracle dumps at 34 frames.
+  The gate's own mutation self-test fails when it should (a flipped RAM bit, and inverted IN1
+  reads, are caught); inverted RANDOM reads in some attract passes are not caught because they
+  never reach a checked state.
+- `passcost`: the five-scenario fit (19,994 passes) reproduces all 15 rows of the pass-cost
+  table committed in `app_loop.c`.
+- `avg`: `avgframe` over the 34 attract dumps - the two walkers inside it agree on all 34, and
+  its output is byte-identical to the disassembly's Python AVG model (`tools/avg_ref.py frame`)
+  on all 34. `avgtime` reports the draw time of the 32 looping lists (mean 19.755 ms, 50.62 Hz).
+  The Python comparison needs `disasm/_survey/roms_extracted/tempest3_cpu64k.bin`, built from
+  your own ROM set with `python3 disasm/gen_from_roms.py "<dir or tempest.zip>" --image-only`
+  (gitignored; the target skips the comparison if it is absent).
+
+The tools open literal Windows paths, so `avg` runs them from a scratch directory of symlinks
+named like those paths (as `selftest` does). The traces and dumps are generated into
+`build/mac/` (about 57 MB of traces) and are not distributed.
+
 ## Verification against MAME
 Compared with `mame tempest3` (rev 3, ROM set verified good) on the same scripted inputs:
 the attract screen's layout, orientation, colours and high-score line match. In a game the
@@ -144,9 +170,11 @@ which is expected from timing.
 - Audio was checked by numbers (about 247 pushes a second, non-silent in a game), not by ear.
   A few underruns occur while the ring buffer primes at start.
 - Cocktail flip, non-default dips, fullscreen and window resize were not exercised.
-- Lockstep runs the ten scripted scenarios in `tests/scenarios` plus the two unscripted attract
-  runs (600 and 5000 frames) - all twelve of the upstream lockstep runs. `gate`, `passcost` and
-  the `avg*` frame tests from `build_all.bat` are not ported.
+- **Gate V (`avgshapes`) is built but not run.** Its reference (`tools/avg_ref.py shapes`) is
+  generated from Atari's own source archive (`ALVROM.MAC`, github.com/historicalsource/tempest),
+  which this repo does not ship and which is not on this machine. `make -f Makefile.mac gatev`
+  runs it if you unpack the archive to `../tempest-main/tempest-main/`.
+- Gates S and E (`tools/gate_s.py`, `tools/gate_e.py`) were not run or ported.
 - No phosphor afterglow, no vsync control (each picture is presented as the core finishes
   it), BMP-only screenshots.
 - The `.app` was run from the command line, not launched from Finder.
