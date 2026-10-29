@@ -1,0 +1,93 @@
+# Makefile.mac - macOS (Apple Silicon) build of the Tempest C port.
+#   make -f Makefile.mac            build the playable binary build/mac/tempest_mac (needs SDL2)
+#   make -f Makefile.mac app        build/mac/Tempest.app (bundles libSDL2)
+#   make -f Makefile.mac check      headless: skeleton + self-test + lockstep
+#   make -f Makefile.mac skeleton   build + run the boot/loop smoke test
+#   make -f Makefile.mac selftest   build + run the headless seam self-test
+#   make -f Makefile.mac lockstep   build + run the lockstep verifier (C vs ROM)
+# Mirrors build_all.bat.  The core is built unchanged; flags only.
+# Needs: Xcode Command Line Tools.  (SDL2 is only needed for the window backend.)
+CC     ?= clang
+OUT    := build/mac
+# the core relies on MSVC pulling NULL in transitively; clang needs it forced (flag only, no core edit)
+FLAGS  := -O2 -std=c11 -Wall -Wextra -Wno-unused-parameter -include stddef.h -I.
+REF    := tests/ref6502
+
+HW      := mathbox.c mbprom.c progrom.c vecrom.c
+GAME    := state.c alexec.c alhar2.c altes2.c aldis2.c alsoun.c alwelg.c alsco2.c alcoin.c allang.c allang_data.c alearo.c alvgut.c
+PORTED  := alvgut.c alhar2.c alcoin.c alsoun.c alexec.c alearo.c alsco2.c allang.c allang_data.c aldis2.c alwelg.c altes2.c
+CHIPS   := c012294.c er2055.c
+SEAM    := avg.c platform/headless/plat_headless.c $(CHIPS)
+STMODS  := state.c alexec.c alhar2.c aldis2.c alsoun.c alwelg.c alsco2.c alcoin.c allang.c allang_data.c alearo.c alvgut.c
+RESET_HOOKS := -DALTES2_SEAM_HAS_RESET_HOOKS
+
+GEN := state_defs.h progrom.c vecrom.c mbprom.c allang_data.c allang_data.h aldis2_data.h alwelg_data.h altes2_data.h
+
+SDL_CFLAGS := $(shell sdl2-config --cflags 2>/dev/null)
+SDL_LIBS   := $(shell sdl2-config --libs 2>/dev/null)
+
+all: $(OUT)/tempest_mac
+
+$(GEN):
+	@echo "MISSING $@ - run the generators in tools/"; exit 1
+
+# the playable binary: SDL2 backend + the game.  win_probe.c is read-only peeks at the
+# machine state (it only looks like a Windows file; it includes no Windows headers).
+$(OUT)/tempest_mac: platform/macos/plat_mac.c platform/windows/win_probe.c app_loop.c $(GAME) $(HW) avg.c $(CHIPS) $(GEN) $(wildcard *.h platform/*.h)
+	@mkdir -p $(OUT)
+	$(CC) $(FLAGS) $(RESET_HOOKS) $(SDL_CFLAGS) platform/macos/plat_mac.c platform/windows/win_probe.c app_loop.c $(GAME) $(HW) avg.c $(CHIPS) $(SDL_LIBS) -o $@
+
+$(OUT)/skeleton: app_loop.c $(GAME) $(HW) $(SEAM) $(GEN) $(wildcard *.h platform/*.h)
+	@mkdir -p $(OUT)
+	$(CC) $(FLAGS) -DTEMPEST_SKELETON_MAIN $(RESET_HOOKS) app_loop.c $(GAME) $(HW) $(SEAM) -o $@
+
+# altes2.c is compiled apart with SYSTEM / DSPSYS renamed so app_loop.c can count them
+$(OUT)/selftest_altes2.o: altes2.c
+	@mkdir -p $(OUT)
+	$(CC) $(FLAGS) $(RESET_HOOKS) -Dsystem_=altes2_system_ -Ddspsys=altes2_dspsys -c altes2.c -o $@
+
+$(OUT)/tempest_selftest: app_loop.c $(STMODS) $(HW) $(SEAM) $(OUT)/selftest_altes2.o $(GEN) $(wildcard *.h platform/*.h)
+	$(CC) $(FLAGS) -DTEMPEST_SELFTEST_MAIN app_loop.c $(STMODS) $(HW) $(SEAM) $(OUT)/selftest_altes2.o -o $@
+
+# the oracle and verifier are foreign/verbatim code: build with -w like build_all.bat's /W3
+$(OUT)/lockstep: tests/refrun.c tests/lockstep.c $(REF)/ref6502.c $(PORTED) state.c $(HW) er2055.c $(GEN)
+	@mkdir -p $(OUT)
+	$(CC) -O2 -std=c11 -w -include stddef.h -I. -I$(REF) -DLOCKSTEP $(RESET_HOOKS) tests/refrun.c tests/lockstep.c state.c $(PORTED) $(HW) $(REF)/ref6502.c er2055.c -o $@
+
+skeleton: $(OUT)/skeleton
+	$(OUT)/skeleton 100
+
+# app_loop.c's self-test opens literal Windows paths ("tests\\scenarios\\selftest_boot.txt",
+# "tests\\ref\\frame_0001.ram", "tests\\ref_selftest\\frame_NNNN.*").  On macOS a backslash is a
+# filename character, so run from a scratch dir of symlinks with those exact names.  No core change.
+# The oracle dumps are not checked in; they are generated here by the real ROM run (lockstep = refrun
+# + verifier): tests\ref = 300 frames of attract, tests\ref_selftest = selftest_boot.txt, 1800 frames.
+$(OUT)/refdumps/.stamp: $(OUT)/lockstep tests/scenarios/selftest_boot.txt
+	rm -rf $(OUT)/refdumps && mkdir -p $(OUT)/refdumps/ref $(OUT)/refdumps/selftest
+	$(OUT)/lockstep --frames 300 --outdir $(OUT)/refdumps/ref > $(OUT)/refdumps/ref.log
+	$(OUT)/lockstep --frames 1800 --script tests/scenarios/selftest_boot.txt --outdir $(OUT)/refdumps/selftest > $(OUT)/refdumps/selftest.log
+	@touch $@
+
+selftest: $(OUT)/tempest_selftest $(OUT)/refdumps/.stamp
+	@rm -rf $(OUT)/run && mkdir -p $(OUT)/run
+	@ln -s ../../../tests/scenarios/selftest_boot.txt '$(OUT)/run/tests\scenarios\selftest_boot.txt'
+	@for f in $(OUT)/refdumps/ref/frame_*; do ln -s ../refdumps/ref/$$(basename $$f) "$(OUT)/run/tests\\ref\\$$(basename $$f)"; done
+	@for f in $(OUT)/refdumps/selftest/frame_*; do ln -s ../refdumps/selftest/$$(basename $$f) "$(OUT)/run/tests\\ref_selftest\\$$(basename $$f)"; done
+	cd $(OUT)/run && ../tempest_selftest
+
+# one scenario each of the four in tests/scenarios (frames from README_selftest.md)
+lockstep: $(OUT)/lockstep
+	$(OUT)/lockstep --frames 1800 --no-dumps --script tests/scenarios/selftest_boot.txt
+
+mac: $(OUT)/tempest_mac
+
+# self-contained bundle: libSDL2 (+ libSDL3 for sdl2-compat) copied into Frameworks
+app: $(OUT)/tempest_mac
+	@sh tools/mac_bundle.sh $(OUT)
+
+check: skeleton selftest lockstep
+
+clean:
+	rm -rf $(OUT)
+
+.PHONY: all mac app skeleton selftest lockstep check clean
