@@ -75,15 +75,15 @@ selftest: $(OUT)/tempest_selftest $(OUT)/refdumps/.stamp
 	@for f in $(OUT)/refdumps/selftest/frame_*; do ln -s ../refdumps/selftest/$$(basename $$f) "$(OUT)/run/tests\\ref_selftest\\$$(basename $$f)"; done
 	cd $(OUT)/run && ../tempest_selftest
 
-# one scenario each of the four in tests/scenarios (frames from README_selftest.md)
+# the four self-test / EAROM scenarios (frames and options from tests/scenarios/README_selftest.md).
+# earom writes the image that earom_readback reads; it goes under build/ (tests/earom/ does not exist).
 lockstep: $(OUT)/lockstep
+	mkdir -p $(OUT)/earom
 	$(OUT)/lockstep --frames 1800 --no-dumps --script tests/scenarios/selftest_boot.txt
-
-mac: $(OUT)/tempest_mac
-
-# self-contained bundle: libSDL2 (+ libSDL3 for sdl2-compat) copied into Frameworks
-app: $(OUT)/tempest_mac
-	@sh tools/mac_bundle.sh $(OUT)
+	$(OUT)/lockstep --frames 2500 --no-dumps --script tests/scenarios/selftest_midrun.txt
+	$(OUT)/lockstep --frames 2600 --no-dumps --script tests/scenarios/earom.txt --earom-out $(OUT)/earom/earom.nv
+	$(OUT)/lockstep --frames 600 --no-dumps --script tests/scenarios/earom_readback.txt --earom-in $(OUT)/earom/earom.nv --earom-out $(OUT)/earom/readback_out.nv
+	cmp $(OUT)/earom/earom.nv $(OUT)/earom/readback_out.nv
 
 check: skeleton selftest lockstep
 

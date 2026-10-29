@@ -113,8 +113,9 @@ make -f Makefile.mac lockstep   # real ROM vs. translated C, call by call
 - `skeleton`: 100 passes of the real boot and loop, no watchdog trips.
 - `selftest`: 38 of 38 seam checks (boot, attract, a coined game with fire / zap / spin, EAROM
   round trip, watchdog reboots, the self-test screens against the ROM oracle's dumps).
-- `lockstep`: 167338 calls compared, 0 failed; 4 RESET regions, 348 MAINLN and 1450 DIAG
-  passes compared, 0 failed.
+- `lockstep`: four scenarios, all PASS, 0 calls failed. `selftest_boot` 167338 calls compared
+  (4 RESET regions, 348 MAINLN and 1450 DIAG passes); `selftest_midrun` 708398; `earom` 808812;
+  `earom_readback` 221042. The image `earom_readback` writes back equals the one it read.
 
 Porting notes (flags only, no core changes):
 - The core uses `NULL` without including a header for it (MSVC allows that); the Makefile
@@ -139,8 +140,9 @@ which is expected from timing.
 - Audio was checked by numbers (about 247 pushes a second, non-silent in a game), not by ear.
   A few underruns occur while the ring buffer primes at start.
 - Cocktail flip, non-default dips, fullscreen and window resize were not exercised.
-- Only the `selftest_boot` scenario is run under lockstep; the other scenarios in
-  `tests/scenarios` are not wired into the Makefile. `gate`, `passcost` and the `avg*` frame
+- Lockstep runs the four self-test / EAROM scenarios (`selftest_boot`, `selftest_midrun`,
+  `earom`, `earom_readback`); the gameplay scenarios in `tests/scenarios` (`coin_start`,
+  `two_player`, `superzapper`, ...) are not wired in. `gate`, `passcost` and the `avg*` frame
   tests from `build_all.bat` are not ported.
 - No phosphor afterglow, no vsync control (each picture is presented as the core finishes
   it), BMP-only screenshots.
